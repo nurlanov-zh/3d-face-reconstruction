@@ -11,6 +11,7 @@ Install packages and build libs
 ./install_dependencies.sh
 ./build_submodules.sh
 ```
+This may take a while, so be patient.
 
 Make project
 ```
@@ -22,6 +23,7 @@ make -j2
 
 # Project stucture
 Input data should be located in folder `data/`.
+Currently we are using neutral face in ply format located in `data/neutral_face.ply`.
 
 `src` contains main code of the project
 
