@@ -1,5 +1,5 @@
 add_subdirectory(common)
 add_subdirectory(utils)
-add_subdirectory(feature_tracking)
+add_subdirectory(landmark_detection)
 add_subdirectory(matching)
 add_subdirectory(tracking)

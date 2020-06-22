@@ -30,4 +30,8 @@ sudo apt-get install -y \
     libsuitesparse-dev \
     wget \
     valgrind \
-    clang-format
+    clang-format \
+    mesa-common-dev \
+    libgl1-mesa-dev \
+    qt5-default \
+    qt5-qmake

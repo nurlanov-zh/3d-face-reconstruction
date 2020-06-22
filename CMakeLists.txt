@@ -7,6 +7,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules/" ${CMAKE_MODUL
 set(EIGEN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/eigen")
 set(CERES_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/build-ceres-solver")
 set(SPDLOG_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/build-spdlog")
+set(OPENMESH_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/build-openmesh")
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
@@ -30,7 +31,7 @@ endif()
 set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN")                   # cmake default: "-g"
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -DNDEBUG -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN")  # cmake default: "-O2 -g -DNDEBUG"
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")                                               # cmake default: "-O3 -DNDEBUG"
-SET(CMAKE_CXX_FLAGS " -ftemplate-backtrace-limit=0 -Wall -Wextra ${EXTRA_WARNING_FLAGS} -march=${CXX_MARCH} ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS " -ftemplate-backtrace-limit=0 -Wall -Wextra ${EXTRA_WARNING_FLAGS} -march=${CXX_MARCH} ${CMAKE_CXX_FLAGS}")
 
 
 set(EIGEN_INCLUDE_DIR_HINTS ${EIGEN_ROOT})
@@ -40,9 +41,7 @@ include_directories(${EIGEN3_INCLUDE_DIR})
   message(STATUS "Found Eigen headers in: ${EIGEN3_INCLUDE_DIR}")
 
 include_directories(thirdparty/Sophus)
-include_directories(thirdparty/CLI11/include)
 include_directories(thirdparty/spdlog/include)
-include_directories(include)
 
 find_package(Ceres 2.0 REQUIRED CONFIG HINTS "${CERES_ROOT}" NO_DEFAULT_PATH)
 
@@ -55,8 +54,14 @@ if(OpenCV_VERSION VERSION_LESS 3)
   set_property(TARGET OpenCV PROPERTY INTERFACE_COMPILE_DEFINITIONS DBATK_OPENCV2)
 endif()
 
-find_package(spdlog REQUIRED CONFIG HINTS "${SPDLOG_ROOT}" NO_DEFAULT_PATH)
+find_package(spdlog REQUIRED)
 message(STATUS "Found spdlog")
+
+find_package(OpenGL REQUIRED)
+find_package(OpenMesh REQUIRED CONFIG HINTS "${OPENMESH_ROOT}" NO_DEFAULT_PATH COMPONENTS OpenMeshCore OpenMeshTools)
+message(STATUS "Found openmesh")
+
+include(ACGQt)
 
 add_subdirectory(src)
 add_subdirectory(thirdparty/googletest)

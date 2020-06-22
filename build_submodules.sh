@@ -44,6 +44,18 @@ rm -rf "$BUILD_CERES"
 rm -rf "$BUILD_SPDLOG"
 rm -rf "$BUILD_OPENMESH"
 
+mkdir -p "$BUILD_SPDLOG"
+pushd "$BUILD_SPDLOG"
+cmake ../spdlog "${COMMON_CMAKE_ARGS[@]}" \
+-DCMAKE_BUILD_TYPE=Release \
+-DSPDLOG_BUILD_SHARED=OFF \
+-DSPDLOG_FMT_EXTERNAL=OFF \
+-DSPDLOG_BUILD_EXAMPLE=OFF \
+-DSPDLOG_BUILD_TESTS=OFF \
+-DCMAKE_INSTALL_PREFIX=install
+make -j$NUM_PARALLEL_BUILDS install
+popd
+
 mkdir -p "$BUILD_CERES"
 pushd "$BUILD_CERES"
 cmake ../ceres-solver "${COMMON_CMAKE_ARGS[@]}" \
@@ -54,14 +66,8 @@ cmake ../ceres-solver "${COMMON_CMAKE_ARGS[@]}" \
 make -j$NUM_PARALLEL_BUILDS ceres
 popd
 
-mkdir -p "$BUILD_SPDLOG"
-pushd "$BUILD_SPDLOG"
-cmake ../spdlog "${COMMON_CMAKE_ARGS[@]}"
-make -j$NUM_PARALLEL_BUILDS
-popd
-
 mkdir -p "$BUILD_OPENMESH"
 pushd "$BUILD_OPENMESH"
-cmake ../OpenMesh "${COMMON_CMAKE_ARGS[@]}"
-make -j$NUM_PARALLEL_BUILDS
+cmake ../OpenMesh "${COMMON_CMAKE_ARGS[@]}" 
+sudo make -j$NUM_PARALLEL_BUILDS install
 popd
