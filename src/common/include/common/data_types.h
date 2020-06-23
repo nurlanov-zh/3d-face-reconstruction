@@ -13,4 +13,12 @@ struct MeshViewerWidgetTraits : public OpenMesh::DefaultTraits
 };
 
 typedef OpenMesh::TriMesh_ArrayKernelT<MeshViewerWidgetTraits> Mesh;
+
+struct float4
+{
+	float x;
+	float y;
+	float z;
+	float w;
+};
 }  // namespace common

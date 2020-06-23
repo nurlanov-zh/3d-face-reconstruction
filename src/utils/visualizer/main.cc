@@ -85,7 +85,6 @@ int main(int argc, char **argv)
 
 	// read data
 	utils::DataReader dataReader("../data", opt);
-	dataReader.readPCAFace();
 
 	// create widget
 	QMainWindow mainWin;
@@ -95,12 +94,13 @@ int main(int argc, char **argv)
 
 	create_menu(mainWin);
 
-	// static mesh, hence use strips
-	w.enable_strips();
-
 	mainWin.resize(1280, 720);
 	mainWin.show();
-	w.setMesh(dataReader.getMesh());
+
+	// You need to set it after alignment
+	w.setMesh(dataReader.getKinectMesh());
+	w.setMesh(dataReader.getNeutralMesh());
+
 
 	// load scene if specified on the command line
 	if (++optind < argc)
