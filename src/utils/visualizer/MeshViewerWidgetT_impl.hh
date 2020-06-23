@@ -67,20 +67,48 @@ using namespace Qt;
 template <typename M>
 void MeshViewerWidgetT<M>::setupMesh()
 {
-	// bounding box
-	typename Mesh::ConstVertexIter vIt(mesh_.vertices_begin());
-	typename Mesh::ConstVertexIter vEnd(mesh_.vertices_end());
-
 	using OpenMesh::Vec3f;
-
 	Vec3f bbMin, bbMax;
+	bbMin = bbMax = OpenMesh::vector_cast<Vec3f>(
+		meshes_[0].point(*(meshes_[0].vertices_begin())));
 
-	bbMin = bbMax = OpenMesh::vector_cast<Vec3f>(mesh_.point(*vIt));
-
-	for (size_t count = 0; vIt != vEnd; ++vIt, ++count)
+	for (auto& mesh : meshes_)
 	{
-		bbMin.minimize(OpenMesh::vector_cast<Vec3f>(mesh_.point(*vIt)));
-		bbMax.maximize(OpenMesh::vector_cast<Vec3f>(mesh_.point(*vIt)));
+		// bounding box
+		typename Mesh::ConstVertexIter vIt(mesh.vertices_begin());
+		typename Mesh::ConstVertexIter vEnd(mesh.vertices_end());
+
+		for (size_t count = 0; vIt != vEnd; ++vIt, ++count)
+		{
+			bbMin.minimize(OpenMesh::vector_cast<Vec3f>(mesh.point(*vIt)));
+			bbMax.maximize(OpenMesh::vector_cast<Vec3f>(mesh.point(*vIt)));
+		}
+
+		consoleLog_->debug(std::to_string(mesh.n_vertices()) + " vertices, " +
+						   std::to_string(mesh.n_edges()) + " edge, " +
+						   std::to_string(mesh.n_faces()) + " faces");
+
+		// base point for displaying face normals
+		{
+			OpenMesh::Utils::Timer t;
+			t.start();
+			mesh.add_property(fp_normal_base_);
+			typename M::FaceIter f_it = mesh.faces_begin();
+			typename M::FaceVertexIter fv_it;
+			for (; f_it != mesh.faces_end(); ++f_it)
+			{
+				typename Mesh::Point v(0, 0, 0);
+				for (fv_it = mesh.fv_iter(*f_it); fv_it.is_valid(); ++fv_it)
+					v += OpenMesh::vector_cast<typename Mesh::Normal>(
+						mesh.point(*fv_it));
+				v *= 1.0f / 3.0f;
+				mesh.property(fp_normal_base_, *f_it) = v;
+			}
+			t.stop();
+			consoleLog_->debug(
+				"Computed base point for displaying face normals [" +
+				t.as_string() + "]");
+		}
 	}
 
 	// set center and radius
@@ -88,43 +116,6 @@ void MeshViewerWidgetT<M>::setupMesh()
 
 	// for normal display
 	normal_scale_ = (bbMax - bbMin).min() * 0.05f;
-
-	// info
-	consoleLog_->debug(std::to_string(mesh_.n_vertices()) + " vertices, " +
-					   std::to_string(mesh_.n_edges()) + " edge, " +
-					   std::to_string(mesh_.n_faces()) + " faces");
-
-	// base point for displaying face normals
-	{
-		OpenMesh::Utils::Timer t;
-		t.start();
-		mesh_.add_property(fp_normal_base_);
-		typename M::FaceIter f_it = mesh_.faces_begin();
-		typename M::FaceVertexIter fv_it;
-		for (; f_it != mesh_.faces_end(); ++f_it)
-		{
-			typename Mesh::Point v(0, 0, 0);
-			for (fv_it = mesh_.fv_iter(*f_it); fv_it.is_valid(); ++fv_it)
-				v += OpenMesh::vector_cast<typename Mesh::Normal>(
-					mesh_.point(*fv_it));
-			v *= 1.0f / 3.0f;
-			mesh_.property(fp_normal_base_, *f_it) = v;
-		}
-		t.stop();
-		consoleLog_->debug("Computed base point for displaying face normals [" +
-						   t.as_string() + "]");
-	}
-
-	//
-	{
-		consoleLog_->debug("Computing strips..");
-		OpenMesh::Utils::Timer t;
-		t.start();
-		compute_strips();
-		t.stop();
-		consoleLog_->debug("done [" + std::to_string(strips_.n_strips()) +
-						   " strips created in " + t.as_string() + "]");
-	}
 }
 
 //-----------------------------------------------------------------------------
@@ -211,284 +202,218 @@ bool MeshViewerWidgetT<M>::set_texture(QImage& _texsrc)
 template <typename M>
 void MeshViewerWidgetT<M>::draw_openmesh(const std::string& _draw_mode)
 {
-	typename Mesh::ConstFaceIter fIt(mesh_.faces_begin()),
-		fEnd(mesh_.faces_end());
+	for (const auto& mesh : meshes_)
+	{
+		typename Mesh::ConstFaceIter fIt(mesh.faces_begin()),
+			fEnd(mesh.faces_end());
 
-	typename Mesh::ConstFaceVertexIter fvIt;
+		typename Mesh::ConstFaceVertexIter fvIt;
 
 #if defined(OM_USE_OSG) && OM_USE_OSG
-	if (_draw_mode ==
-		"OpenSG Indices")  // --------------------------------------
-	{
-		glEnableClientState(GL_VERTEX_ARRAY);
-		glVertexPointer(3, GL_FLOAT, 0, mesh_.points());
-
-		glEnableClientState(GL_NORMAL_ARRAY);
-		glNormalPointer(GL_FLOAT, 0, mesh_.vertex_normals());
-
-		if (tex_id_ && mesh_.has_vertex_texcoords2D())
+		if (_draw_mode ==
+			"OpenSG Indices")  // --------------------------------------
 		{
-			glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-			glTexCoordPointer(2, GL_FLOAT, 0, mesh_.texcoords2D());
-			glEnable(GL_TEXTURE_2D);
-			glBindTexture(GL_TEXTURE_2D, tex_id_);
-			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, tex_mode_);
+			glEnableClientState(GL_VERTEX_ARRAY);
+			glVertexPointer(3, GL_FLOAT, 0, mesh.points());
+
+			glEnableClientState(GL_NORMAL_ARRAY);
+			glNormalPointer(GL_FLOAT, 0, mesh.vertex_normals());
+
+			if (tex_id_ && mesh.has_vertex_texcoords2D())
+			{
+				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+				glTexCoordPointer(2, GL_FLOAT, 0, mesh.texcoords2D());
+				glEnable(GL_TEXTURE_2D);
+				glBindTexture(GL_TEXTURE_2D, tex_id_);
+				glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, tex_mode_);
+			}
+
+			glDrawElements(GL_TRIANGLES, mesh.osg_indices()->size(),
+						   GL_UNSIGNED_INT, &mesh.osg_indices()->getField()[0]);
+
+			glDisableClientState(GL_VERTEX_ARRAY);
+			glDisableClientState(GL_NORMAL_ARRAY);
+			glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 		}
-
-		glDrawElements(GL_TRIANGLES, mesh_.osg_indices()->size(),
-					   GL_UNSIGNED_INT, &mesh_.osg_indices()->getField()[0]);
-
-		glDisableClientState(GL_VERTEX_ARRAY);
-		glDisableClientState(GL_NORMAL_ARRAY);
-		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-	}
-	else
+		else
 #endif
 
-		if (_draw_mode ==
-			"Wireframe")  // -------------------------------------------
-	{
-		glBegin(GL_TRIANGLES);
-		for (; fIt != fEnd; ++fIt)
+			if (_draw_mode ==
+				"Wireframe")  // -------------------------------------------
 		{
-			fvIt = mesh_.cfv_iter(*fIt);
-			glVertex3fv(&mesh_.point(*fvIt)[0]);
-			++fvIt;
-			glVertex3fv(&mesh_.point(*fvIt)[0]);
-			++fvIt;
-			glVertex3fv(&mesh_.point(*fvIt)[0]);
-		}
-		glEnd();
-	}
-
-	else if (_draw_mode ==
-			 "Solid Flat")  // -------------------------------------
-	{
-		glBegin(GL_TRIANGLES);
-		for (; fIt != fEnd; ++fIt)
-		{
-			glNormal3fv(&mesh_.normal(*fIt)[0]);
-
-			fvIt = mesh_.cfv_iter(*fIt);
-			glVertex3fv(&mesh_.point(*fvIt)[0]);
-			++fvIt;
-			glVertex3fv(&mesh_.point(*fvIt)[0]);
-			++fvIt;
-			glVertex3fv(&mesh_.point(*fvIt)[0]);
-		}
-		glEnd();
-	}
-
-	else if (_draw_mode ==
-			 "Solid Smooth")  // -----------------------------------
-	{
-		glEnableClientState(GL_VERTEX_ARRAY);
-		glVertexPointer(3, GL_FLOAT, 0, mesh_.points());
-
-		glEnableClientState(GL_NORMAL_ARRAY);
-		glNormalPointer(GL_FLOAT, 0, mesh_.vertex_normals());
-
-		if (tex_id_ && mesh_.has_vertex_texcoords2D())
-		{
-			glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-			glTexCoordPointer(2, GL_FLOAT, 0, mesh_.texcoords2D());
-			glEnable(GL_TEXTURE_2D);
-			glBindTexture(GL_TEXTURE_2D, tex_id_);
-			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, tex_mode_);
-		}
-
-		glBegin(GL_TRIANGLES);
-		for (; fIt != fEnd; ++fIt)
-		{
-			fvIt = mesh_.cfv_iter(*fIt);
-			glArrayElement(fvIt->idx());
-			++fvIt;
-			glArrayElement(fvIt->idx());
-			++fvIt;
-			glArrayElement(fvIt->idx());
-		}
-		glEnd();
-
-		glDisableClientState(GL_VERTEX_ARRAY);
-		glDisableClientState(GL_NORMAL_ARRAY);
-		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-
-		if (tex_id_ && mesh_.has_vertex_texcoords2D())
-		{
-			glDisable(GL_TEXTURE_2D);
-		}
-	}
-
-	else if (_draw_mode ==
-			 "Colored Vertices")  // --------------------------------
-	{
-		glEnableClientState(GL_VERTEX_ARRAY);
-		glVertexPointer(3, GL_FLOAT, 0, mesh_.points());
-
-		glEnableClientState(GL_NORMAL_ARRAY);
-		glNormalPointer(GL_FLOAT, 0, mesh_.vertex_normals());
-
-		if (mesh_.has_vertex_colors())
-		{
-			glEnableClientState(GL_COLOR_ARRAY);
-			glColorPointer(3, GL_UNSIGNED_BYTE, 0, mesh_.vertex_colors());
-		}
-
-		glBegin(GL_TRIANGLES);
-		for (; fIt != fEnd; ++fIt)
-		{
-			fvIt = mesh_.cfv_iter(*fIt);
-			glArrayElement(fvIt->idx());
-			++fvIt;
-			glArrayElement(fvIt->idx());
-			++fvIt;
-			glArrayElement(fvIt->idx());
-		}
-		glEnd();
-
-		glDisableClientState(GL_VERTEX_ARRAY);
-		glDisableClientState(GL_NORMAL_ARRAY);
-		glDisableClientState(GL_COLOR_ARRAY);
-	}
-
-	else if (_draw_mode ==
-			 "Solid Colored Faces")  // -----------------------------
-	{
-		glEnableClientState(GL_VERTEX_ARRAY);
-		glVertexPointer(3, GL_FLOAT, 0, mesh_.points());
-
-		glEnableClientState(GL_NORMAL_ARRAY);
-		glNormalPointer(GL_FLOAT, 0, mesh_.vertex_normals());
-
-		glBegin(GL_TRIANGLES);
-		for (; fIt != fEnd; ++fIt)
-		{
-			glColor(*fIt);
-
-			fvIt = mesh_.cfv_iter(*fIt);
-			glArrayElement(fvIt->idx());
-			++fvIt;
-			glArrayElement(fvIt->idx());
-			++fvIt;
-			glArrayElement(fvIt->idx());
-		}
-		glEnd();
-
-		glDisableClientState(GL_VERTEX_ARRAY);
-		glDisableClientState(GL_NORMAL_ARRAY);
-	}
-
-	else if (_draw_mode ==
-			 "Smooth Colored Faces")  // ---------------------------
-	{
-		glEnableClientState(GL_VERTEX_ARRAY);
-		glVertexPointer(3, GL_FLOAT, 0, mesh_.points());
-
-		glEnableClientState(GL_NORMAL_ARRAY);
-		glNormalPointer(GL_FLOAT, 0, mesh_.vertex_normals());
-
-		glBegin(GL_TRIANGLES);
-		for (; fIt != fEnd; ++fIt)
-		{
-			glMaterial(*fIt);
-
-			fvIt = mesh_.cfv_iter(*fIt);
-			glArrayElement(fvIt->idx());
-			++fvIt;
-			glArrayElement(fvIt->idx());
-			++fvIt;
-			glArrayElement(fvIt->idx());
-		}
-		glEnd();
-
-		glDisableClientState(GL_VERTEX_ARRAY);
-		glDisableClientState(GL_NORMAL_ARRAY);
-	}
-
-	else if (_draw_mode == "Strips'n VertexArrays")  // ------------------------
-	{
-		glEnableClientState(GL_VERTEX_ARRAY);
-		glVertexPointer(3, GL_FLOAT, 0, mesh_.points());
-
-		glEnableClientState(GL_NORMAL_ARRAY);
-		glNormalPointer(GL_FLOAT, 0, mesh_.vertex_normals());
-
-		if (tex_id_ && mesh_.has_vertex_texcoords2D())
-		{
-			glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-			glTexCoordPointer(2, GL_FLOAT, 0, mesh_.texcoords2D());
-			glEnable(GL_TEXTURE_2D);
-			glBindTexture(GL_TEXTURE_2D, tex_id_);
-			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, tex_mode_);
-		}
-
-		typename MyStripifier::StripsIterator strip_it = strips_.begin();
-		typename MyStripifier::StripsIterator strip_last = strips_.end();
-
-		// Draw all strips
-		for (; strip_it != strip_last; ++strip_it)
-		{
-			glDrawElements(GL_TRIANGLE_STRIP,
-						   static_cast<GLsizei>(strip_it->size()),
-						   GL_UNSIGNED_INT, &(*strip_it)[0]);
-		}
-
-		glDisableClientState(GL_VERTEX_ARRAY);
-		glDisableClientState(GL_NORMAL_ARRAY);
-		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-	}
-
-	else if (_draw_mode == "Show Strips" &&
-			 strips_.is_valid())  // -------------
-	{
-		typename MyStripifier::StripsIterator strip_it = strips_.begin();
-		typename MyStripifier::StripsIterator strip_last = strips_.end();
-
-		float cmax = 256.0f;
-		int range = 220;
-		int base = (int)cmax - range;
-		int drcol = 13;
-		int dgcol = 31;
-		int dbcol = 17;
-
-		int rcol = 0, gcol = dgcol, bcol = dbcol + dbcol;
-
-		// Draw all strips
-		for (; strip_it != strip_last; ++strip_it)
-		{
-			typename MyStripifier::IndexIterator idx_it = strip_it->begin();
-			typename MyStripifier::IndexIterator idx_last = strip_it->end();
-
-			rcol = (rcol + drcol) % range;
-			gcol = (gcol + dgcol) % range;
-			bcol = (bcol + dbcol) % range;
-
-			glBegin(GL_TRIANGLE_STRIP);
-			glColor3f((rcol + base) / cmax, (gcol + base) / cmax,
-					  (bcol + base) / cmax);
-			for (; idx_it != idx_last; ++idx_it)
-				glVertex3fv(
-					&mesh_.point(OM_TYPENAME Mesh::VertexHandle(*idx_it))[0]);
+			glBegin(GL_TRIANGLES);
+			for (; fIt != fEnd; ++fIt)
+			{
+				fvIt = mesh.cfv_iter(*fIt);
+				glVertex3fv(&mesh.point(*fvIt)[0]);
+				++fvIt;
+				glVertex3fv(&mesh.point(*fvIt)[0]);
+				++fvIt;
+				glVertex3fv(&mesh.point(*fvIt)[0]);
+			}
 			glEnd();
 		}
-		glColor3f(1.0, 1.0, 1.0);
-	}
 
-	else if (_draw_mode ==
-			 "Points")  // -----------------------------------------
-	{
-		glEnableClientState(GL_VERTEX_ARRAY);
-		glVertexPointer(3, GL_FLOAT, 0, mesh_.points());
-
-		if (mesh_.has_vertex_colors() && use_color_)
+		else if (_draw_mode ==
+				 "Solid Flat")  // -------------------------------------
 		{
-			glEnableClientState(GL_COLOR_ARRAY);
-			glColorPointer(3, GL_UNSIGNED_BYTE, 0, mesh_.vertex_colors());
+			glBegin(GL_TRIANGLES);
+			for (; fIt != fEnd; ++fIt)
+			{
+				glNormal3fv(&mesh.normal(*fIt)[0]);
+
+				fvIt = mesh.cfv_iter(*fIt);
+				glVertex3fv(&mesh.point(*fvIt)[0]);
+				++fvIt;
+				glVertex3fv(&mesh.point(*fvIt)[0]);
+				++fvIt;
+				glVertex3fv(&mesh.point(*fvIt)[0]);
+			}
+			glEnd();
 		}
 
-		glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(mesh_.n_vertices()));
-		glDisableClientState(GL_VERTEX_ARRAY);
-		glDisableClientState(GL_COLOR_ARRAY);
+		else if (_draw_mode ==
+				 "Solid Smooth")  // -----------------------------------
+		{
+			glEnableClientState(GL_VERTEX_ARRAY);
+			glVertexPointer(3, GL_FLOAT, 0, mesh.points());
+
+			glEnableClientState(GL_NORMAL_ARRAY);
+			glNormalPointer(GL_FLOAT, 0, mesh.vertex_normals());
+
+			if (tex_id_ && mesh.has_vertex_texcoords2D())
+			{
+				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+				glTexCoordPointer(2, GL_FLOAT, 0, mesh.texcoords2D());
+				glEnable(GL_TEXTURE_2D);
+				glBindTexture(GL_TEXTURE_2D, tex_id_);
+				glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, tex_mode_);
+			}
+
+			glBegin(GL_TRIANGLES);
+			for (; fIt != fEnd; ++fIt)
+			{
+				fvIt = mesh.cfv_iter(*fIt);
+				glArrayElement(fvIt->idx());
+				++fvIt;
+				glArrayElement(fvIt->idx());
+				++fvIt;
+				glArrayElement(fvIt->idx());
+			}
+			glEnd();
+
+			glDisableClientState(GL_VERTEX_ARRAY);
+			glDisableClientState(GL_NORMAL_ARRAY);
+			glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+
+			if (tex_id_ && mesh.has_vertex_texcoords2D())
+			{
+				glDisable(GL_TEXTURE_2D);
+			}
+		}
+
+		else if (_draw_mode ==
+				 "Colored Vertices")  // --------------------------------
+		{
+			glEnableClientState(GL_VERTEX_ARRAY);
+			glVertexPointer(3, GL_FLOAT, 0, mesh.points());
+
+			glEnableClientState(GL_NORMAL_ARRAY);
+			glNormalPointer(GL_FLOAT, 0, mesh.vertex_normals());
+
+			if (mesh.has_vertex_colors())
+			{
+				glEnableClientState(GL_COLOR_ARRAY);
+				glColorPointer(3, GL_UNSIGNED_BYTE, 0, mesh.vertex_colors());
+			}
+
+			glBegin(GL_TRIANGLES);
+			for (; fIt != fEnd; ++fIt)
+			{
+				fvIt = mesh.cfv_iter(*fIt);
+				glArrayElement(fvIt->idx());
+				++fvIt;
+				glArrayElement(fvIt->idx());
+				++fvIt;
+				glArrayElement(fvIt->idx());
+			}
+			glEnd();
+
+			glDisableClientState(GL_VERTEX_ARRAY);
+			glDisableClientState(GL_NORMAL_ARRAY);
+			glDisableClientState(GL_COLOR_ARRAY);
+		}
+
+		else if (_draw_mode ==
+				 "Solid Colored Faces")  // -----------------------------
+		{
+			glEnableClientState(GL_VERTEX_ARRAY);
+			glVertexPointer(3, GL_FLOAT, 0, mesh.points());
+
+			glEnableClientState(GL_NORMAL_ARRAY);
+			glNormalPointer(GL_FLOAT, 0, mesh.vertex_normals());
+
+			glBegin(GL_TRIANGLES);
+			for (; fIt != fEnd; ++fIt)
+			{
+				glColor(*fIt, mesh);
+
+				fvIt = mesh.cfv_iter(*fIt);
+				glArrayElement(fvIt->idx());
+				++fvIt;
+				glArrayElement(fvIt->idx());
+				++fvIt;
+				glArrayElement(fvIt->idx());
+			}
+			glEnd();
+
+			glDisableClientState(GL_VERTEX_ARRAY);
+			glDisableClientState(GL_NORMAL_ARRAY);
+		}
+
+		else if (_draw_mode ==
+				 "Smooth Colored Faces")  // ---------------------------
+		{
+			glEnableClientState(GL_VERTEX_ARRAY);
+			glVertexPointer(3, GL_FLOAT, 0, mesh.points());
+
+			glEnableClientState(GL_NORMAL_ARRAY);
+			glNormalPointer(GL_FLOAT, 0, mesh.vertex_normals());
+
+			glBegin(GL_TRIANGLES);
+			for (; fIt != fEnd; ++fIt)
+			{
+				glMaterial(*fIt, mesh);
+
+				fvIt = mesh.cfv_iter(*fIt);
+				glArrayElement(fvIt->idx());
+				++fvIt;
+				glArrayElement(fvIt->idx());
+				++fvIt;
+				glArrayElement(fvIt->idx());
+			}
+			glEnd();
+
+			glDisableClientState(GL_VERTEX_ARRAY);
+			glDisableClientState(GL_NORMAL_ARRAY);
+		}
+
+		else if (_draw_mode ==
+				 "Points")  // -----------------------------------------
+		{
+			glEnableClientState(GL_VERTEX_ARRAY);
+			glVertexPointer(3, GL_FLOAT, 0, mesh.points());
+
+			if (mesh.has_vertex_colors() && use_color_)
+			{
+				glEnableClientState(GL_COLOR_ARRAY);
+				glColorPointer(3, GL_UNSIGNED_BYTE, 0, mesh.vertex_colors());
+			}
+
+			glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(mesh.n_vertices()));
+			glDisableClientState(GL_VERTEX_ARRAY);
+			glDisableClientState(GL_COLOR_ARRAY);
+		}
 	}
 }
 
@@ -497,7 +422,10 @@ void MeshViewerWidgetT<M>::draw_openmesh(const std::string& _draw_mode)
 template <typename M>
 void MeshViewerWidgetT<M>::draw_scene(const std::string& _draw_mode)
 {
-	if (!mesh_.n_vertices()) return;
+	for (const auto& mesh : meshes_)
+	{
+		if (!mesh.n_vertices()) return;
+	}
 
 #if defined(OM_USE_OSG) && OM_USE_OSG
 	else if (_draw_mode == "OpenSG Indices")
@@ -545,17 +473,10 @@ void MeshViewerWidgetT<M>::draw_scene(const std::string& _draw_mode)
 		draw_openmesh(_draw_mode);
 	}
 
-	else if (_draw_mode == "Solid Smooth" ||
-			 _draw_mode == "Strips'n VertexArrays")
+	else if (_draw_mode == "Solid Smooth")
 	{
 		glEnable(GL_LIGHTING);
 		glShadeModel(GL_SMOOTH);
-		draw_openmesh(_draw_mode);
-	}
-
-	else if (_draw_mode == "Show Strips")
-	{
-		glDisable(GL_LIGHTING);
 		draw_openmesh(_draw_mode);
 	}
 
@@ -582,61 +503,42 @@ void MeshViewerWidgetT<M>::draw_scene(const std::string& _draw_mode)
 		setDefaultMaterial();
 	}
 
-	if (show_vnormals_)
+	for (const auto& mesh : meshes_)
 	{
-		typename Mesh::VertexIter vit;
-		glDisable(GL_LIGHTING);
-		glBegin(GL_LINES);
-		glColor3f(1.000f, 0.803f, 0.027f);  // orange
-		for (vit = mesh_.vertices_begin(); vit != mesh_.vertices_end(); ++vit)
+		if (show_vnormals_)
 		{
-			glVertex(*vit);
-			glVertex(mesh_.point(*vit) + normal_scale_ * mesh_.normal(*vit));
+			typename Mesh::VertexIter vit;
+			glDisable(GL_LIGHTING);
+			glBegin(GL_LINES);
+			glColor3f(1.000f, 0.803f, 0.027f);  // orange
+			for (vit = mesh.vertices_begin(); vit != mesh.vertices_end(); ++vit)
+			{
+				glVertex(*vit, mesh);
+				glVertex(mesh.point(*vit) + normal_scale_ * mesh.normal(*vit));
+			}
+			glEnd();
 		}
-		glEnd();
-	}
 
-	if (show_fnormals_)
-	{
-		typename Mesh::FaceIter fit;
-		glDisable(GL_LIGHTING);
-		glBegin(GL_LINES);
-		glColor3f(0.705f, 0.976f, 0.270f);  // greenish
-		for (fit = mesh_.faces_begin(); fit != mesh_.faces_end(); ++fit)
+		if (show_fnormals_)
 		{
-			glVertex(mesh_.property(fp_normal_base_, *fit));
-			glVertex(mesh_.property(fp_normal_base_, *fit) +
-					 normal_scale_ * mesh_.normal(*fit));
+			typename Mesh::FaceIter fit;
+			glDisable(GL_LIGHTING);
+			glBegin(GL_LINES);
+			glColor3f(0.705f, 0.976f, 0.270f);  // greenish
+			for (fit = mesh.faces_begin(); fit != mesh.faces_end(); ++fit)
+			{
+				glVertex(mesh.property(fp_normal_base_, *fit));
+				glVertex(mesh.property(fp_normal_base_, *fit) +
+						normal_scale_ * mesh.normal(*fit));
+			}
+			glEnd();
 		}
-		glEnd();
 	}
 }
 
 //-----------------------------------------------------------------------------
 
-template <typename M>
-void MeshViewerWidgetT<M>::enable_strips()
-{
-	if (!f_strips_)
-	{
-		f_strips_ = true;
-		add_draw_mode("Strips'n VertexArrays");
-		add_draw_mode("Show Strips");
-	}
-}
-
 //-----------------------------------------------------------------------------
-
-template <typename M>
-void MeshViewerWidgetT<M>::disable_strips()
-{
-	if (f_strips_)
-	{
-		f_strips_ = false;
-		del_draw_mode("Show Strips");
-		del_draw_mode("Strip'n VertexArrays");
-	}
-}
 
 //-----------------------------------------------------------------------------
 
@@ -650,7 +552,7 @@ void MeshViewerWidgetT<M>::keyPressEvent(QKeyEvent* _event)
 	switch (_event->key())
 	{
 		case Key_D:
-			if (mesh_.has_vertex_colors() && (current_draw_mode() == "Points"))
+			if (meshes_[0].has_vertex_colors() && (current_draw_mode() == "Points"))
 			{
 				use_color_ = !use_color_;
 				std::cout << "use color: " << (use_color_ ? "yes\n" : "no\n");
@@ -676,24 +578,28 @@ void MeshViewerWidgetT<M>::keyPressEvent(QKeyEvent* _event)
 			break;
 
 		case Key_I:
-			std::cout << "\n# Vertices     : " << mesh_.n_vertices()
-					  << std::endl;
-			std::cout << "# Edges        : " << mesh_.n_edges() << std::endl;
-			std::cout << "# Faces        : " << mesh_.n_faces() << std::endl;
-			std::cout << "binary  input  : " << opt_.check(opt_.Binary)
-					  << std::endl;
-			std::cout << "swapped input  : " << opt_.check(opt_.Swap)
-					  << std::endl;
-			std::cout << "vertex normal  : " << opt_.check(opt_.VertexNormal)
-					  << std::endl;
-			std::cout << "vertex texcoord: " << opt_.check(opt_.VertexTexCoord)
-					  << std::endl;
-			std::cout << "vertex color   : " << opt_.check(opt_.VertexColor)
-					  << std::endl;
-			std::cout << "face normal    : " << opt_.check(opt_.FaceNormal)
-					  << std::endl;
-			std::cout << "face color     : " << opt_.check(opt_.FaceColor)
-					  << std::endl;
+			for (const auto& mesh : meshes_)
+			{
+				std::cout << "\n# Vertices     : " << mesh.n_vertices()
+						<< std::endl;
+				std::cout << "# Edges        : " << mesh.n_edges() << std::endl;
+				std::cout << "# Faces        : " << mesh.n_faces() << std::endl;
+				std::cout << "binary  input  : " << opt_.check(opt_.Binary)
+						<< std::endl;
+				std::cout << "swapped input  : " << opt_.check(opt_.Swap)
+						<< std::endl;
+				std::cout << "vertex normal  : " << opt_.check(opt_.VertexNormal)
+						<< std::endl;
+				std::cout << "vertex texcoord: " << opt_.check(opt_.VertexTexCoord)
+						<< std::endl;
+				std::cout << "vertex color   : " << opt_.check(opt_.VertexColor)
+						<< std::endl;
+				std::cout << "face normal    : " << opt_.check(opt_.FaceNormal)
+						<< std::endl;
+				std::cout << "face color     : " << opt_.check(opt_.FaceColor)
+						<< std::endl;
+				std::cout << std::endl;
+			}
 			this->QGLViewerWidget::keyPressEvent(_event);
 			break;
 
@@ -720,10 +626,11 @@ void MeshViewerWidgetT<M>::keyPressEvent(QKeyEvent* _event)
 			this->QGLViewerWidget::keyPressEvent(_event);
 	}
 }
+
 template <typename M>
 void MeshViewerWidgetT<M>::setMesh(const Mesh& mesh)
 {
-	mesh_ = mesh;
+	meshes_.push_back(mesh);
 	setupMesh();
 }
 

@@ -74,10 +74,8 @@ class MeshViewerWidgetT : public QGLViewerWidget
 	/// default constructor
 	explicit MeshViewerWidgetT(QWidget* _parent = 0)
 		: QGLViewerWidget(_parent),
-		  f_strips_(false),
 		  tex_id_(0),
 		  tex_mode_(GL_MODULATE),
-		  strips_(mesh_),
 		  use_color_(true),
 		  show_vnormals_(false),
 		  show_fnormals_(false),
@@ -98,13 +96,7 @@ class MeshViewerWidgetT : public QGLViewerWidget
 	virtual bool open_texture(const char* _filename);
 	bool set_texture(QImage& _texsrc);
 
-	void enable_strips();
-	void disable_strips();
-
 	void setMesh(const Mesh& mesh);
-
-	Mesh& mesh() { return mesh_; }
-	const Mesh& mesh() const { return mesh_; }
 
    protected:
 	/// inherited drawing method
@@ -115,59 +107,51 @@ class MeshViewerWidgetT : public QGLViewerWidget
 	/// draw the mesh
 	virtual void draw_openmesh(const std::string& _drawmode);
 
-	void glVertex(const typename Mesh::VertexHandle _vh)
+	void glVertex(const typename Mesh::VertexHandle _vh, const Mesh& mesh)
 	{
-		glVertex3fv(&mesh_.point(_vh)[0]);
+		glVertex3fv(&mesh.point(_vh)[0]);
 	}
 
 	void glVertex(const typename Mesh::Point& _p) { glVertex3fv(&_p[0]); }
 
-	void glNormal(const typename Mesh::VertexHandle _vh)
+	void glNormal(const typename Mesh::VertexHandle _vh, const Mesh& mesh)
 	{
-		glNormal3fv(&mesh_.normal(_vh)[0]);
+		glNormal3fv(&mesh.normal(_vh)[0]);
 	}
 
-	void glTexCoord(const typename Mesh::VertexHandle _vh)
+	void glTexCoord(const typename Mesh::VertexHandle _vh, const Mesh& mesh)
 	{
-		glTexCoord2fv(&mesh_.texcoord(_vh)[0]);
+		glTexCoord2fv(&mesh.texcoord(_vh)[0]);
 	}
 
-	void glColor(const typename Mesh::VertexHandle _vh)
+	void glColor(const typename Mesh::VertexHandle _vh, const Mesh& mesh)
 	{
-		glColor3ubv(&mesh_.color(_vh)[0]);
+		glColor3ubv(&mesh.color(_vh)[0]);
 	}
 
 	// face properties
 
-	void glNormal(const typename Mesh::FaceHandle _fh)
+	void glNormal(const typename Mesh::FaceHandle _fh, const Mesh& mesh)
 	{
-		glNormal3fv(&mesh_.normal(_fh)[0]);
+		glNormal3fv(&mesh.normal(_fh)[0]);
 	}
 
-	void glColor(const typename Mesh::FaceHandle _fh)
+	void glColor(const typename Mesh::FaceHandle _fh, const Mesh& mesh)
 	{
-		glColor3ubv(&mesh_.color(_fh)[0]);
+		glColor3ubv(&mesh.color(_fh)[0]);
 	}
 
-	void glMaterial(const typename Mesh::FaceHandle _fh,
+	void glMaterial(const typename Mesh::FaceHandle _fh, const Mesh& mesh,
 					int _f = GL_FRONT_AND_BACK, int _m = GL_DIFFUSE)
 	{
 		OpenMesh::Vec3f c =
-			OpenMesh::color_cast<OpenMesh::Vec3f>(mesh_.color(_fh));
+			OpenMesh::color_cast<OpenMesh::Vec3f>(mesh.color(_fh));
 		OpenMesh::Vec4f m(c[0], c[1], c[2], 1.0f);
 
 		glMaterialfv(_f, _m, &m[0]);
 	}
 
    protected:  // Strip support
-	void compute_strips(void)
-	{
-		if (f_strips_)
-		{
-			strips_.clear();
-			strips_.stripify();
-		}
-	}
 
    protected:  // inherited
 	virtual void keyPressEvent(QKeyEvent* _event) override;
@@ -176,13 +160,12 @@ class MeshViewerWidgetT : public QGLViewerWidget
 	std::shared_ptr<spdlog::logger> consoleLog_;
 	std::shared_ptr<spdlog::logger> errLog_;
 
-	bool f_strips_;  // enable/disable strip usage
 	GLuint tex_id_;
 	GLint tex_mode_;
 	OpenMesh::IO::Options opt_;  // mesh file contained texcoords?
 
-	Mesh mesh_;
-	MyStripifier strips_;
+	std::vector<Mesh> meshes_;
+
 	bool use_color_;
 	bool show_vnormals_;
 	bool show_fnormals_;
