@@ -1,6 +1,6 @@
 include (ACGCommon)
 
-if (CMAKE_GENERATOR MATCHES "Visual Studio")
+if (MSVC)
 	add_compile_definitions(_USE_MATH_DEFINES)
 endif ()
 
