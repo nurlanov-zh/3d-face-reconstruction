@@ -71,11 +71,20 @@ class DataReader
 	const common::Mesh& getKinectMesh() const { return kinectMesh_; }
 	common::Mesh& getKinectMesh() { return kinectMesh_; }
 
+	std::vector<common::Vec2f> getCorrespondences(){ return correspondences_; }
+	common::Mesh& getProcrustesMesh()
+	{
+		readProcrustes();
+		return procrustesMesh_;
+	}
+
    private:
 	void readPCAFace();
 	void readExpressionsData();
 	void readAlbedoData();
 	void readKinectData();
+	void readCorrespondences();
+	void readProcrustes();
 
 	float* loadEigenvectors(const std::string& filename,
 							unsigned int components,
@@ -83,6 +92,8 @@ class DataReader
 	void loadVector(const std::string& filename, float* res,
 					unsigned int length);
 	bool openMesh(const std::string& filename, common::Mesh& neutralMesh);
+
+	void loadCorrespondences(const std::string& filename);
 
    private:
 	std::shared_ptr<spdlog::logger> consoleLog_;
@@ -92,6 +103,7 @@ class DataReader
 	OpenMesh::IO::Options opt_;
 	common::Mesh neutralMesh_;
 	common::Mesh kinectMesh_;
+	common::Mesh procrustesMesh_;
 
 	std::vector<common::float4> shapeBasis_;
 	std::vector<float> shapeBasisDev_;
@@ -101,5 +113,7 @@ class DataReader
 
 	std::vector<common::float4> albedoBasis_;
 	std::vector<float> albedoBasisDev_;
+
+	std::vector<common::Vec2f> correspondences_;
 };
 }  // namespace utils

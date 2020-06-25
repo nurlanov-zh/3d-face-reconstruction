@@ -13,9 +13,13 @@ const std::string EXP_BASIS_NAME = "/ExpressionBasis.matrix";
 const std::string EXP_BASIS_DEV_NAME = "/StandardDeviationExpression.vec";
 const std::string ALBEDO_BASIS_NAME = "/AlbedoBasis.matrix";
 const std::string ALBEDO_BASIS_DEV_NAME = "/StandardDeviationAlbedo.vec";
+const std::string SPARSE_CORR_NAME = "/sparse.corr";
+const std::string PROCRUSTES_NAME = "/procrustes.off";
+
 constexpr size_t NUM_OF_EIG_SHAPE = 160;
 constexpr size_t NUM_OF_EIG_EXP = 76;
 constexpr size_t NUM_OF_VERTICES = 213960;
+constexpr size_t NUM_OF_SPARSE_CORR = 4;
 constexpr double SCALE_NEUTRAL = 1/1000000.0f;
 
 DataReader::DataReader(const std::string& path, OpenMesh::IO::Options opt)
@@ -32,10 +36,13 @@ DataReader::DataReader(const std::string& path, OpenMesh::IO::Options opt)
 	albedoBasis_.resize(NUM_OF_EIG_SHAPE * NUM_OF_VERTICES);
 	albedoBasisDev_.resize(NUM_OF_EIG_SHAPE);
 
+	correspondences_.resize(NUM_OF_SPARSE_CORR);
+
 	readPCAFace();
 	readExpressionsData();
 	readAlbedoData();
 	readKinectData();
+	readCorrespondences();
 }
 
 void DataReader::readPCAFace()
@@ -179,6 +186,31 @@ void DataReader::readKinectData()
 	consoleLog_->info("Kinect mesh is not loaded");
 }
 
+void DataReader::readCorrespondences() 
+{
+	const auto start = std::chrono::steady_clock::now();
+	const std::string filenameCorr =
+		path_ + "/" + SPARSE_CORR_NAME;
+	loadCorrespondences(filenameCorr);
+	const auto end = std::chrono::steady_clock::now();
+	consoleLog_->info(
+		"Correnspondences are successfully loaded in " +
+		std::to_string(
+			std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+				.count()) +
+		"ms");
+}
+
+void DataReader::readProcrustes() {
+	const std::string filename = path_ + "/" + PROCRUSTES_NAME;
+	if (openMesh(filename, procrustesMesh_))
+	{
+		consoleLog_->info("Procrustes mesh successfully loaded");
+		return;
+	}
+	consoleLog_->info("Procrustes mesh is not loaded");
+}
+
 bool DataReader::openMesh(const std::string& filename, common::Mesh& mesh)
 {
 	mesh.request_face_normals();
@@ -237,6 +269,30 @@ bool DataReader::openMesh(const std::string& filename, common::Mesh& mesh)
 		return true;
 	}
 	return false;
+}
+
+void DataReader::loadCorrespondences(const std::string& filename) 
+{
+	int x, y;
+	std::ifstream in(filename);
+
+	if (!in)
+	{
+		errLog_->error("ERROR:\tCan not open file: " + filename);
+		return;
+	}
+
+	unsigned int length = 0;
+	in >> length;
+
+
+	for (x = 0; x < length; x++)
+	{
+		in >> correspondences_[x][0] >> correspondences_[x][1]; //averageMesh >> kinectdata
+	}
+
+	in.close();
+
 }
 
 void DataReader::loadVector(const std::string& filename, float* res,

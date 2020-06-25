@@ -39,6 +39,7 @@
  *                                                                           *
  * ========================================================================= */
 #include <data_reader/data_reader.h>
+#include <sparse/sparse_aligner.h>
 
 #include <QApplication>
 #include <QFileDialog>
@@ -97,10 +98,13 @@ int main(int argc, char **argv)
 	mainWin.resize(1280, 720);
 	mainWin.show();
 
-	// You need to set it after alignment
+	SparseAligner aligner;
+	if (aligner.alignSparse(dataReader.getKinectMesh(),
+							dataReader.getNeutralMesh(),
+							dataReader.getCorrespondences()))
+		w.setMesh(dataReader.getProcrustesMesh());
 	w.setMesh(dataReader.getKinectMesh());
 	w.setMesh(dataReader.getNeutralMesh());
-
 
 	// load scene if specified on the command line
 	if (++optind < argc)
