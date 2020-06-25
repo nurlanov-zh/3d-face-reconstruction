@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
-
 project(data_reader)
+
+if (MSVC)
+	add_compile_definitions(_USE_MATH_DEFINES)
+endif ()
 
 include_directories(include)
 

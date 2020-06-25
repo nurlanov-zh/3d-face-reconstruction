@@ -1,5 +1,9 @@
 include (ACGCommon)
 
+if (CMAKE_GENERATOR MATCHES "Visual Studio")
+	add_compile_definitions(_USE_MATH_DEFINES)
+endif ()
+
 include_directories (
   ../../../thirdparty/build-openmesh/install
   ${CMAKE_CURRENT_SOURCE_DIR}
