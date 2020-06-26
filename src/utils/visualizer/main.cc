@@ -102,8 +102,14 @@ int main(int argc, char **argv)
 	if (aligner.alignSparse(dataReader.getKinectMesh(),
 							dataReader.getNeutralMesh(),
 							dataReader.getCorrespondences()))
+	{
 		w.setMesh(dataReader.getProcrustesMesh());
-	w.setMesh(dataReader.getKinectMesh());
+	}
+	else
+	{
+		w.setMesh(dataReader.getKinectMesh());
+	}
+
 	w.setMesh(dataReader.getNeutralMesh());
 
 	// load scene if specified on the command line
