@@ -32,7 +32,7 @@ acg_add_executable (face_viewer ${sources} ${headers})
 
 target_link_libraries (face_viewer
   common
-  matching
+  sparse
   data_reader
   OpenMeshCore
   OpenMeshTools

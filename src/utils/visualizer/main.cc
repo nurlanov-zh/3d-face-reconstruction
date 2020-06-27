@@ -98,8 +98,7 @@ int main(int argc, char **argv)
 	mainWin.resize(1280, 720);
 	mainWin.show();
 
-	SparseAligner aligner;
-	if (aligner.alignSparse(dataReader.getKinectMesh(),
+	if (matching::sparse::alignSparse(dataReader.getKinectMesh(),
 							dataReader.getNeutralMesh(),
 							dataReader.getCorrespondences()))
 	{
