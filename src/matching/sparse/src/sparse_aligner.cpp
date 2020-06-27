@@ -1,24 +1,18 @@
 #include <sparse/procrustes.h>
 #include <sparse/sparse_aligner.h>
-#include <spdlog\spdlog.h>
+#include <spdlog/spdlog.h>
 #include <fstream>
+
+#if VISUALIZE_PROCRUSTES_MESH
 
 const std::string PROCRUSTES_MESH_LOCATION = "../data/procrustes.off";
 const std::string SOURCE_MESH_LOCATION = "../data/kinectdata.off";
 
-std::ifstream& GotoLine(std::ifstream& file, unsigned int n)
-{
-	file.seekg(std::ios::beg);
-	for (int i = 0; i < n - 1; ++i)
-	{
-		file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-	}
-	return file;
-}
+#endif
 
-bool matching::sparse::alignSparse(common::Mesh& sourceMesh,
-								   common::Mesh& targetMesh,
-								   std::vector<common::Vec2f> correspondences)
+common::Matrix4f matching::sparse::alignSparse(
+	common::Mesh& sourceMesh, common::Mesh& targetMesh,
+	std::vector<common::Vec2f> correspondences)
 {
 	std::vector<common::Vector3f> sourcePoints;
 	std::vector<common::Vector3f> targetPoints;
@@ -64,14 +58,34 @@ bool matching::sparse::alignSparse(common::Mesh& sourceMesh,
 
 	common::Matrix4f estimatedPose = estimatePose(sourcePoints, targetPoints);
 
+	// Print estimatedPose in Debug
+	std::stringstream ss;
+	ss << estimatedPose;
+	spdlog::get("console")->debug(ss.str());
+
+#if VISUALIZE_PROCRUSTES_MESH
+
 	if (!transformAndWrite(sourceMesh, estimatedPose))
 	{
 		spdlog::get("stderr")->warn(
 			"Could not write procrustes transformation!");
-		return false;
+		throw std::runtime_error("Procrustes mesh");
 	}
+#endif
 
-	return true;
+	return estimatedPose;
+}
+
+#if VISUALIZE_PROCRUSTES_MESH
+
+std::ifstream& GotoLine(std::ifstream& file, unsigned int n)
+{
+	file.seekg(std::ios::beg);
+	for (int i = 0; i < n - 1; ++i)
+	{
+		file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+	}
+	return file;
 }
 
 bool matching::sparse::transformAndWrite(common::Mesh& sourceMesh,
@@ -121,3 +135,5 @@ bool matching::sparse::transformAndWrite(common::Mesh& sourceMesh,
 
 	return true;
 }
+
+#endif

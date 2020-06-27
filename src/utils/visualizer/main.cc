@@ -98,16 +98,19 @@ int main(int argc, char **argv)
 	mainWin.resize(1280, 720);
 	mainWin.show();
 
-	if (matching::sparse::alignSparse(dataReader.getKinectMesh(),
-							dataReader.getNeutralMesh(),
-							dataReader.getCorrespondences()))
-	{
-		w.setMesh(dataReader.getProcrustesMesh());
-	}
-	else
-	{
+	common::Matrix4f estimatedPose = matching::sparse::alignSparse(
+		dataReader.getKinectMesh(), dataReader.getNeutralMesh(),
+		dataReader.getCorrespondences());
+
+#if VISUALIZE_PROCRUSTES_MESH
+
+	spdlog::get("console")->info("Visualizing procrustes mesh is on.");
+	w.setMesh(dataReader.getProcrustesMesh());
+
+#else
+		spdlog::get("console")->info("Visualizing procrustes mesh is off.");
 		w.setMesh(dataReader.getKinectMesh());
-	}
+#endif
 
 	w.setMesh(dataReader.getNeutralMesh());
 
