@@ -40,6 +40,7 @@
  * ========================================================================= */
 #include <data_reader/data_reader.h>
 #include <sparse/sparse_aligner.h>
+#include <icp/icp.h>
 
 #include <QApplication>
 #include <QFileDialog>
@@ -98,21 +99,17 @@ int main(int argc, char **argv)
 	mainWin.resize(1280, 720);
 	mainWin.show();
 
-	common::Matrix4f estimatedPose = matching::sparse::alignSparse(
-		dataReader.getKinectMesh(), dataReader.getNeutralMesh(),
-		dataReader.getCorrespondences());
+	common::Mesh &kinectMesh = dataReader.getKinectMesh();
+	common::Mesh &neutralMesh = dataReader.getNeutralMesh();
+	const auto &correspondences = dataReader.getCorrespondences();
 
-#if VISUALIZE_PROCRUSTES_MESH
+	common::Matrix4f estimatedPose =
+		matching::sparse::alignSparse(neutralMesh, kinectMesh, correspondences);
 
-	spdlog::get("console")->info("Visualizing procrustes mesh is on.");
-	w.setMesh(dataReader.getProcrustesMesh());
-
-#else
-		spdlog::get("console")->info("Visualizing procrustes mesh is off.");
-		w.setMesh(dataReader.getKinectMesh());
-#endif
-
-	w.setMesh(dataReader.getNeutralMesh());
+	tracking::icp::trackICP(neutralMesh, kinectMesh, correspondences);
+	
+	w.setMesh(kinectMesh);
+	w.setMesh(neutralMesh);
 
 	// load scene if specified on the command line
 	if (++optind < argc)

@@ -288,7 +288,7 @@ void DataReader::loadCorrespondences(const std::string& filename)
 
 	for (x = 0; x < length; x++)
 	{
-		in >> correspondences_[x][0] >> correspondences_[x][1]; //averageMesh >> kinectdata
+		in >> correspondences_[x][1] >> correspondences_[x][0]; //averageMesh >> kinectdata
 	}
 
 	in.close();

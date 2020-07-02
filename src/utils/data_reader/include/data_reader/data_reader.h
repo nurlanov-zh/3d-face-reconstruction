@@ -71,7 +71,7 @@ class DataReader
 	const common::Mesh& getKinectMesh() const { return kinectMesh_; }
 	common::Mesh& getKinectMesh() { return kinectMesh_; }
 
-	std::vector<common::Vec2f> getCorrespondences(){ return correspondences_; }
+	std::vector<common::Vec2i> getCorrespondences(){ return correspondences_; }
 	common::Mesh& getProcrustesMesh()
 	{
 		readProcrustes();
@@ -114,6 +114,6 @@ class DataReader
 	std::vector<common::float4> albedoBasis_;
 	std::vector<float> albedoBasisDev_;
 
-	std::vector<common::Vec2f> correspondences_;
+	std::vector<common::Vec2i> correspondences_;
 };
 }  // namespace utils
