@@ -9,6 +9,8 @@ namespace icp
 
 const int nIterations = 15;
 const float maxMatchingDist = 0.000015f;
+const float outlierMinDistance = 0.15f;
+
 
 bool trackICP(common::Mesh& sourceMesh, common::Mesh& targetMesh,
 			  const std::vector<common::Vec2i>& correspondences);

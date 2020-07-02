@@ -73,7 +73,7 @@ void removeOutliers(common::Mesh& mesh, common::Vector3f mean)
 		common::Vector3f vecPoint =
 			common::Vector3f(point[0], point[1], point[2]);
 		float distance = (mean - vecPoint).norm();
-		if (distance > 0.15f) keep = false;
+		if (distance > tracking::icp::outlierMinDistance) keep = false;
 
 		if (!keep)
 		{
