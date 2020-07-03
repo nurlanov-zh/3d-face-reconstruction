@@ -3,6 +3,9 @@
 #include <iostream>
 #include "sparse/procrustes.h"
 
+
+
+
 using namespace matching::sparse;
 namespace tracking
 {
@@ -89,19 +92,59 @@ void removeOutliers(common::Mesh& mesh, common::Vector3f mean)
 	}
 	mesh.garbage_collection();
 }
+void prepareConstraints(const std::vector<common::Vector3f>& sourcePoints,
+						const std::vector<common::Vector3f>& targetPoints,
+						const std::vector<Match> matches,
+						const PoseIncrement<double>& poseIncrement,
+						ceres::Problem& problem)
+{
+	const unsigned nPoints = sourcePoints.size();
 
+	for (unsigned i = 0; i < nPoints; ++i)
+	{
+		const auto match = matches[i];
+
+		if (match.idx >= 0)
+		{
+			const auto& sourcePoint = sourcePoints[i];
+			const auto& targetPoint = targetPoints[match.idx];
+
+			if (!sourcePoint.allFinite() || !targetPoint.allFinite()) continue;
+
+			// DONE: Create a new point-to-point cost function and add it as
+			// constraint (i.e. residual block) to the Ceres problem.
+			problem.AddResidualBlock(
+				PointToPointConstraint::create(sourcePoint, targetPoint,
+											   match.weight),
+				nullptr, poseIncrement.getData());
+		}
+	}
+	std::cout << "prepare constraints done. \n";
+}
+
+void configureSolver(ceres::Solver::Options& options)
+{
+	// Ceres options.
+	options.trust_region_strategy_type = ceres::LEVENBERG_MARQUARDT;
+	options.use_nonmonotonic_steps = false;
+	options.linear_solver_type = ceres::DENSE_QR;
+	options.minimizer_progress_to_stdout = 1;
+	options.max_num_iterations = 1;
+	options.num_threads = 8;
+	std::cout << "configure solver done. \n";
+}
 common::Matrix4f tracking::icp::estimatePose(
 	const std::vector<common::Vector3f> sourceMesh,
 	const std::vector<common::Vector3f> targetMesh)
 {
 	std::unique_ptr<NearestNeighborSearch> m_nearestNeighborSearch =
 		std::make_unique<NearestNeighborSearchFlann>();
-	m_nearestNeighborSearch->setMatchingMaxDistance(tracking::icp::maxMatchingDist);
 	m_nearestNeighborSearch->buildIndex(targetMesh);
-
-	// The initial estimate can be given as an argument.
 	common::Matrix4f estimatedPose = common::Matrix4f::Identity();
-
+	// The initial estimate can be given as an argument.
+	double incrementArray[6];
+	auto poseIncrement = tracking::icp::PoseIncrement<double>(incrementArray);
+	poseIncrement.setZero();
 	for (int i = 0; i < tracking::icp::nIterations; ++i)
 	{
 		// Compute the matches.
@@ -118,20 +161,28 @@ common::Matrix4f tracking::icp::estimatePose(
 		double elapsedSecs = double(end - begin) / CLOCKS_PER_SEC;
 		std::cout << "Completed in " << elapsedSecs << " seconds." << std::endl;
 
-		std::vector<common::Vector3f> sourcePoints;
-		std::vector<common::Vector3f> targetPoints;
+		ceres::Problem problem;
+		prepareConstraints(transformedPoints, targetMesh, matches, poseIncrement,
+						   problem);
 
-		for (int j = 0; j < transformedPoints.size(); j++)
-		{
-			const auto& match = matches[j];
-			if (match.idx >= 0)
-			{
-				sourcePoints.push_back(transformedPoints[j]);
-				targetPoints.push_back(targetMesh[match.idx]);
-			}
-		}
-		estimatedPose = estimatePosePointToPoint(sourcePoints, targetPoints) *
+		// Configure options for the solver.
+		ceres::Solver::Options options;
+		configureSolver(options);
+
+		// Run the solver (for one iteration).
+		ceres::Solver::Summary summary;
+		ceres::Solve(options, &problem, &summary);
+		std::cout << "solving done \n";
+		std::cout << summary.BriefReport() << std::endl;
+		// std::cout << summary.FullReport() << std::endl;
+
+		// Update the current pose estimate (we always update the pose from the
+		// left, using left-increment notation).
+		common::Matrix4f matrix = PoseIncrement<double>::convertToMatrix(poseIncrement);
+		estimatedPose = PoseIncrement<double>::convertToMatrix(poseIncrement) *
 						estimatedPose;
+		poseIncrement.setZero();
+
 
 		std::cout << "Optimization iteration done." << std::endl;
 	}
