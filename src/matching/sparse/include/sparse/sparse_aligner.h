@@ -1,21 +1,12 @@
 #pragma once
 
 #include <common/data_types.h>
-#include <OpenMesh/Core/IO/MeshIO.hh>
-#include <OpenMesh/Core/IO/Options.hh>
-
-#define VISUALIZE_PROCRUSTES_MESH 0;
 
 namespace matching
 {
 namespace sparse
 {
-
-common::Matrix4f alignSparse(common::Mesh& sourceMesh, common::Mesh& targetMesh,
-							 std::vector<common::Vec2f> correspondences);
-
-bool transformAndWrite(common::Mesh& sourceMesh,
-					   common::Matrix4f estimatedPose);
-
+bool alignSparse(common::Mesh& sourceMesh, const common::Mesh& targetMesh,
+				 const std::vector<common::Vec2i>& correspondences);
 }  // namespace sparse
 }  // namespace matching

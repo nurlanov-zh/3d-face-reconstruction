@@ -273,7 +273,6 @@ bool DataReader::openMesh(const std::string& filename, common::Mesh& mesh)
 
 void DataReader::loadCorrespondences(const std::string& filename) 
 {
-	int x, y;
 	std::ifstream in(filename);
 
 	if (!in)
@@ -282,13 +281,12 @@ void DataReader::loadCorrespondences(const std::string& filename)
 		return;
 	}
 
-	unsigned int length = 0;
+	size_t length = 0;
 	in >> length;
 
-
-	for (x = 0; x < length; x++)
+	for (size_t x = 0; x < length; x++)
 	{
-		in >> correspondences_[x][0] >> correspondences_[x][1]; //averageMesh >> kinectdata
+		in >> correspondences_[x][1] >> correspondences_[x][0]; // kinectdata >> averageMesh
 	}
 
 	in.close();

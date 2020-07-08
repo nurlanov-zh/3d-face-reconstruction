@@ -39,6 +39,7 @@
  *                                                                           *
  * ========================================================================= */
 #include <data_reader/data_reader.h>
+#include <non_rigid_icp/non_rigid_icp.h>
 #include <sparse/sparse_aligner.h>
 
 #include <QApplication>
@@ -98,27 +99,79 @@ int main(int argc, char **argv)
 	mainWin.resize(1280, 720);
 	mainWin.show();
 
-	common::Matrix4f estimatedPose = matching::sparse::alignSparse(
-		dataReader.getKinectMesh(), dataReader.getNeutralMesh(),
-		dataReader.getCorrespondences());
+	common::Mesh &kinectMesh = dataReader.getKinectMesh();
+	common::Mesh &neutralMesh = dataReader.getNeutralMesh();
+	const auto &correspondences = dataReader.getCorrespondences();
 
-#if VISUALIZE_PROCRUSTES_MESH
+	if (!kinectMesh.has_vertex_normals())
+	{
+		kinectMesh.request_vertex_normals();
+	}
 
-	spdlog::get("console")->info("Visualizing procrustes mesh is on.");
-	w.setMesh(dataReader.getProcrustesMesh());
+	if (!neutralMesh.has_vertex_normals())
+	{
+		neutralMesh.request_vertex_normals();
+	}
 
-#else
-		spdlog::get("console")->info("Visualizing procrustes mesh is off.");
-		w.setMesh(dataReader.getKinectMesh());
+	std::shared_ptr<common::PointCloud> cloud =
+		std::make_shared<common::PointCloud>();
+	cloud->pts.reserve(kinectMesh.n_vertices());
+	size_t i = 0;
+	for (common::Mesh::VertexIter vit = kinectMesh.vertices_begin();
+		 vit != kinectMesh.vertices_end(); ++i, ++vit)
+	{
+		const auto point = kinectMesh.point(*vit);
+		const common::PointCloud::Point pt = {point[0], point[1], point[2]};
+		cloud->pts.push_back(pt);
+	}
+
+	std::shared_ptr<common::kdTree_t> index =
+		std::make_shared<common::kdTree_t>(
+			3, *cloud.get(), nanoflann::KDTreeSingleIndexAdaptorParams(10));
+	index->buildIndex();
+
+	common::Target target;
+	target.kdTree = index;
+	target.pc = cloud;
+	target.mesh = kinectMesh;
+
+	const bool procrustesResult =
+		matching::sparse::alignSparse(neutralMesh, kinectMesh, correspondences);
+
+	matching::refinement::NRICPParams params;
+	params.numOfEdges = neutralMesh.n_edges();
+	params.numOfVertices = neutralMesh.n_vertices();
+	params.numOfLandmarks = correspondences.size();
+	params.betaInit = 1;
+	params.alphaInit = 100;
+	params.alphaMin = 50;
+	params.numOfOuterIterations = 3;
+	auto nricp = matching::refinement::NRICP(params);
+
+	if (procrustesResult)
+	{
+#ifdef VISUALIZE_PROCRUSTES_MESH
+		w.setMesh(neutralMesh);
 #endif
+		nricp.findDeformation(neutralMesh, target, {});
+		w.setMesh(neutralMesh);
+	}
+	else
+	{
+		spdlog::get("error")->error("Procrustes failed");
+		return -1;
+	}
 
-	w.setMesh(dataReader.getNeutralMesh());
+	w.setMesh(kinectMesh);
 
 	// load scene if specified on the command line
 	if (++optind < argc)
 	{
 		w.open_texture_gui(argv[optind]);
 	}
+
+	kinectMesh.release_vertex_normals();
+	neutralMesh.release_vertex_normals();
 
 	return app.exec();
 }

@@ -1,0 +1,1 @@
+add_subdirectory(non_rigid_icp)

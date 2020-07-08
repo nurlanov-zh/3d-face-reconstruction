@@ -1,96 +1,23 @@
-#include <sparse/procrustes.h>
-#include <sparse/sparse_aligner.h>
+#include "sparse/sparse_aligner.h"
+#include "sparse/procrustes.h"
+
 #include <spdlog/spdlog.h>
 #include <fstream>
 
-#if VISUALIZE_PROCRUSTES_MESH
-
+namespace matching
+{
+namespace sparse
+{
+#ifdef VISUALIZE_PROCRUSTES_MESH
 const std::string PROCRUSTES_MESH_LOCATION = "../data/procrustes.off";
 const std::string SOURCE_MESH_LOCATION = "../data/kinectdata.off";
-
 #endif
 
-common::Matrix4f matching::sparse::alignSparse(
-	common::Mesh& sourceMesh, common::Mesh& targetMesh,
-	std::vector<common::Vec2f> correspondences)
+bool transformAndWrite(common::Mesh& sourceMesh,
+					   const common::Matrix4f& estimatedPose)
 {
-	std::vector<common::Vector3f> sourcePoints;
-	std::vector<common::Vector3f> targetPoints;
+#ifdef VISUALIZE_PROCRUSTES_MESH
 
-	common::Mesh::VertexIter v_it = sourceMesh.vertices_begin();
-	for (int i = 0; i < correspondences.size(); i++)
-	{
-		v_it = sourceMesh.vertices_begin();
-
-		// Fill source correspondences
-		while (v_it.handle().idx() < correspondences[i][0] &&
-			   v_it != sourceMesh.vertices_end())
-		{
-			v_it++;
-		}
-		if (v_it.handle().idx() != correspondences[i][0])
-		{
-			spdlog::get("stderr")->error(
-				"Wrong source correspondences ids! Abort!");
-			throw std::runtime_error("Correspondences in Source");
-		}
-		sourcePoints.push_back(common::Vector3f(sourceMesh.point(*v_it)[0],
-												sourceMesh.point(*v_it)[1],
-												sourceMesh.point(*v_it)[2]));
-
-		// Fill target correspondences
-		v_it = targetMesh.vertices_begin();
-		while (v_it.handle().idx() < correspondences[i][1] &&
-			   v_it != targetMesh.vertices_end())
-		{
-			v_it++;
-		}
-		if (v_it.handle().idx() != correspondences[i][1])
-		{
-			spdlog::get("stderr")->error(
-				"Wrong target correspondences ids! Abort!");
-			throw std::runtime_error("Correspondences in Target");
-		}
-		targetPoints.push_back(common::Vector3f(targetMesh.point(*v_it)[0],
-												targetMesh.point(*v_it)[1],
-												targetMesh.point(*v_it)[2]));
-	}
-
-	common::Matrix4f estimatedPose = estimatePose(sourcePoints, targetPoints);
-
-	// Print estimatedPose in Debug
-	std::stringstream ss;
-	ss << estimatedPose;
-	spdlog::get("console")->debug(ss.str());
-
-#if VISUALIZE_PROCRUSTES_MESH
-
-	if (!transformAndWrite(sourceMesh, estimatedPose))
-	{
-		spdlog::get("stderr")->warn(
-			"Could not write procrustes transformation!");
-		throw std::runtime_error("Procrustes mesh");
-	}
-#endif
-
-	return estimatedPose;
-}
-
-#if VISUALIZE_PROCRUSTES_MESH
-
-std::ifstream& GotoLine(std::ifstream& file, unsigned int n)
-{
-	file.seekg(std::ios::beg);
-	for (int i = 0; i < n - 1; ++i)
-	{
-		file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-	}
-	return file;
-}
-
-bool matching::sparse::transformAndWrite(common::Mesh& sourceMesh,
-										 common::Matrix4f estimatedPose)
-{
 	std::ofstream outFile(PROCRUSTES_MESH_LOCATION);
 	std::ifstream orgMesh(SOURCE_MESH_LOCATION);
 
@@ -106,23 +33,28 @@ bool matching::sparse::transformAndWrite(common::Mesh& sourceMesh,
 	std::string line;
 	std::getline(orgMesh, line);
 	outFile << line << std::endl;
+#endif
 
 	// Write transformed points
 	common::Mesh::VertexIter v_it = sourceMesh.vertices_sbegin();
 	while (v_it != sourceMesh.vertices_end())
 	{
-		common::Vec3f point = sourceMesh.point(v_it.handle());
-		common::Vector4f newPoint =
+		const common::Vec3f point = sourceMesh.point(*v_it);
+		const common::Vector4f newPoint =
 			estimatedPose * common::Vector4f(point[0], point[1], point[2], 1);
 
+		sourceMesh.set_point(*v_it, {newPoint(0), newPoint(1), newPoint(2)});
+
+#ifdef VISUALIZE_PROCRUSTES_MESH
 		outFile << newPoint(0) << " " << newPoint(1) << " " << newPoint(2)
 				<< " " << 255 << " " << 0 << " " << 0 << " " << 0 << std::endl;
-
+#endif
 		v_it++;
 	}
 
+#ifdef VISUALIZE_PROCRUSTES_MESH
 	// Copy triangles from original mesh
-	GotoLine(orgMesh, v_it.handle().idx() + 3);
+	GotoLine(orgMesh, v_it->idx() + 3);
 	std::string point;
 	while (orgMesh.eof() == 0)
 	{
@@ -132,8 +64,60 @@ bool matching::sparse::transformAndWrite(common::Mesh& sourceMesh,
 
 	orgMesh.close();
 	outFile.close();
+#endif
 
 	return true;
 }
 
+bool alignSparse(common::Mesh& sourceMesh, const common::Mesh& targetMesh,
+				 const std::vector<common::Vec2i>& correspondences)
+{
+	std::vector<common::Vector3f> sourcePoints;
+	std::vector<common::Vector3f> targetPoints;
+
+	for (size_t i = 0; i < correspondences.size(); i++)
+	{
+		const auto sourcePoint =
+			sourceMesh.point(OpenMesh::VertexHandle(correspondences[i][0]));
+		const auto targetPoint =
+			targetMesh.point(OpenMesh::VertexHandle(correspondences[i][1]));
+
+		sourcePoints.push_back(
+			common::Vector3f(sourcePoint[0], sourcePoint[1], sourcePoint[2]));
+
+		targetPoints.push_back(
+			common::Vector3f(targetPoint[0], targetPoint[1], targetPoint[2]));
+	}
+
+	common::Matrix4f estimatedPose = estimatePose(sourcePoints, targetPoints);
+
+	// Print estimatedPose in Debug
+	std::stringstream ss;
+	ss << estimatedPose;
+	spdlog::get("console")->debug(ss.str());
+
+	if (!transformAndWrite(sourceMesh, estimatedPose))
+	{
+		spdlog::get("stderr")->warn(
+			"Could not write procrustes transformation!");
+		throw std::runtime_error("Procrustes mesh");
+	}
+
+	return true;
+}
+
+#if VISUALIZE_PROCRUSTES_MESH
+std::ifstream& GotoLine(std::ifstream& file, unsigned int n)
+{
+	file.seekg(std::ios::beg);
+	for (int i = 0; i < n - 1; ++i)
+	{
+		file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+	}
+	return file;
+}
 #endif
+
+
+}  // namespace sparse
+}  // namespace matching
