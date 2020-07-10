@@ -17,3 +17,6 @@
 [submodule "thirdparty/OpenMesh"]
 	path = thirdparty/OpenMesh
 	url = https://www.graphics.rwth-aachen.de:9000/OpenMesh/OpenMesh.git
+[submodule "thirdparty/dlib"]
+	path = thirdparty/dlib
+	url = https://github.com/davisking/dlib.git

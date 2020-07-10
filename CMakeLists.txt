@@ -8,6 +8,7 @@ set(EIGEN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/eigen")
 set(CERES_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/build-ceres-solver")
 set(SPDLOG_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/build-spdlog")
 set(OPENMESH_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/build-openmesh")
+set(DLIB_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/build-dlib")
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
@@ -28,9 +29,10 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "App
   set(EXTRA_WARNING_FLAGS "${EXTRA_WARNING_FLAGS} -Wno-exceptions")
 endif()
 
-set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN")                   # cmake default: "-g"
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -DNDEBUG -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN")  # cmake default: "-O2 -g -DNDEBUG"
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")                                               # cmake default: "-O3 -DNDEBUG"
+set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN -std=c++17 -lstdc++fs")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -DNDEBUG -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN  -std=c++17 -lstdc++fs")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -std=c++17 -lstdc++fs")
+link_libraries(stdc++fs)
 
 if (MSVC)
     CMAKE_POLICY(SET CMP0100 NEW)
@@ -51,7 +53,7 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 include_directories(thirdparty/Sophus)
 include_directories(thirdparty/spdlog/include)
 
-find_package(Ceres 2.0 REQUIRED CONFIG HINTS "${CERES_ROOT}" NO_DEFAULT_PATH)
+find_package(Ceres 2.0 REQUIRED CONFIG HINTS "${CERES_ROOT}" /usr/local/lib/cmake/Ceres/CeresConfigVersion.cmake)
 
 find_package(OpenCV REQUIRED COMPONENTS core features2d video)
 message(STATUS "Found OpenCV ${OpenCV_VERSION} headers in: ${OpenCV_INCLUDE_DIRS}")
@@ -66,8 +68,16 @@ find_package(spdlog REQUIRED)
 message(STATUS "Found spdlog")
 
 find_package(OpenGL REQUIRED)
-find_package(OpenMesh REQUIRED CONFIG HINTS "${OPENMESH_ROOT}" NO_DEFAULT_PATH COMPONENTS OpenMeshCore OpenMeshTools)
+find_package(OpenMesh REQUIRED CONFIG HINTS "${OPENMESH_ROOT}" /usr/local/share/OpenMesh/cmake/OpenMeshConfig.cmake COMPONENTS OpenMeshCore OpenMeshTools)
 message(STATUS "Found openmesh")
+
+find_package(dlib REQUIRED CONFIG HINTS "${DLIB_ROOT}" /usr/local/lib/cmake/dlib/dlibConfigVersion.cmake)
+set(USE_AVX_INSTRUCTIONS ON CACHE BOOL "Use AVX instructions")
+
+find_package(PCL REQUIRED)
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
+include_directories(${PCL_INCLUDE_DIRS})
 
 include(ACGQt)
 

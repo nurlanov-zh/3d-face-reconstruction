@@ -36,13 +36,15 @@ COMMON_CMAKE_ARGS=(
 BUILD_CERES=thirdparty/build-ceres-solver
 BUILD_SPDLOG=thirdparty/build-spdlog
 BUILD_OPENMESH=thirdparty/build-openmesh
+BUILD_DLIB=thirdparty/build-dlib
 
 git submodule sync --recursive
 git submodule update --init --recursive
 
-rm -rf "$BUILD_CERES"
-rm -rf "$BUILD_SPDLOG"
-rm -rf "$BUILD_OPENMESH"
+sudo rm -rf "$BUILD_CERES"
+sudo rm -rf "$BUILD_SPDLOG"
+sudo rm -rf "$BUILD_OPENMESH"
+sudo rm -rf "$BUILD_DLIB"
 
 mkdir -p "$BUILD_SPDLOG"
 pushd "$BUILD_SPDLOG"
@@ -69,5 +71,11 @@ popd
 mkdir -p "$BUILD_OPENMESH"
 pushd "$BUILD_OPENMESH"
 cmake ../OpenMesh "${COMMON_CMAKE_ARGS[@]}" 
+sudo make -j$NUM_PARALLEL_BUILDS install
+popd
+
+mkdir -p "$BUILD_DLIB"
+pushd "$BUILD_DLIB"
+cmake ../dlib "${COMMON_CMAKE_ARGS[@]}"
 sudo make -j$NUM_PARALLEL_BUILDS install
 popd

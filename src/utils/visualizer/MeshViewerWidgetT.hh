@@ -97,6 +97,7 @@ class MeshViewerWidgetT : public QGLViewerWidget
 	bool set_texture(QImage& _texsrc);
 
 	void setMesh(const Mesh& mesh);
+	void clearMeshes();
 
    protected:
 	/// inherited drawing method
@@ -152,7 +153,6 @@ class MeshViewerWidgetT : public QGLViewerWidget
 	}
 
    protected:  // Strip support
-
    protected:  // inherited
 	virtual void keyPressEvent(QKeyEvent* _event) override;
 

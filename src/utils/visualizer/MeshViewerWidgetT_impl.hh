@@ -116,6 +116,7 @@ void MeshViewerWidgetT<M>::setupMesh()
 
 	// for normal display
 	normal_scale_ = (bbMax - bbMin).min() * 0.05f;
+	std::cout << normal_scale_ << std::endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -529,7 +530,7 @@ void MeshViewerWidgetT<M>::draw_scene(const std::string& _draw_mode)
 			{
 				glVertex(mesh.property(fp_normal_base_, *fit));
 				glVertex(mesh.property(fp_normal_base_, *fit) +
-						normal_scale_ * mesh.normal(*fit));
+						 normal_scale_ * mesh.normal(*fit));
 			}
 			glEnd();
 		}
@@ -552,7 +553,8 @@ void MeshViewerWidgetT<M>::keyPressEvent(QKeyEvent* _event)
 	switch (_event->key())
 	{
 		case Key_D:
-			if (meshes_[0].has_vertex_colors() && (current_draw_mode() == "Points"))
+			if (meshes_[0].has_vertex_colors() &&
+				(current_draw_mode() == "Points"))
 			{
 				use_color_ = !use_color_;
 				std::cout << "use color: " << (use_color_ ? "yes\n" : "no\n");
@@ -581,23 +583,23 @@ void MeshViewerWidgetT<M>::keyPressEvent(QKeyEvent* _event)
 			for (const auto& mesh : meshes_)
 			{
 				std::cout << "\n# Vertices     : " << mesh.n_vertices()
-						<< std::endl;
+						  << std::endl;
 				std::cout << "# Edges        : " << mesh.n_edges() << std::endl;
 				std::cout << "# Faces        : " << mesh.n_faces() << std::endl;
 				std::cout << "binary  input  : " << opt_.check(opt_.Binary)
-						<< std::endl;
+						  << std::endl;
 				std::cout << "swapped input  : " << opt_.check(opt_.Swap)
-						<< std::endl;
-				std::cout << "vertex normal  : " << opt_.check(opt_.VertexNormal)
-						<< std::endl;
-				std::cout << "vertex texcoord: " << opt_.check(opt_.VertexTexCoord)
-						<< std::endl;
+						  << std::endl;
+				std::cout << "vertex normal  : "
+						  << opt_.check(opt_.VertexNormal) << std::endl;
+				std::cout << "vertex texcoord: "
+						  << opt_.check(opt_.VertexTexCoord) << std::endl;
 				std::cout << "vertex color   : " << opt_.check(opt_.VertexColor)
-						<< std::endl;
+						  << std::endl;
 				std::cout << "face normal    : " << opt_.check(opt_.FaceNormal)
-						<< std::endl;
+						  << std::endl;
 				std::cout << "face color     : " << opt_.check(opt_.FaceColor)
-						<< std::endl;
+						  << std::endl;
 				std::cout << std::endl;
 			}
 			this->QGLViewerWidget::keyPressEvent(_event);
@@ -632,6 +634,12 @@ void MeshViewerWidgetT<M>::setMesh(const Mesh& mesh)
 {
 	meshes_.push_back(mesh);
 	setupMesh();
+}
+
+template <typename M>
+void MeshViewerWidgetT<M>::clearMeshes()
+{
+	meshes_.clear();
 }
 
 #undef TEXMODE

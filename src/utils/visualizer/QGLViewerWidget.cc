@@ -115,6 +115,8 @@ void QGLViewerWidget::init(void)
 	a = add_draw_mode("Wireframe");
 	a->setShortcut(QKeySequence(Key_W));
 	add_draw_mode("Solid Flat");
+	add_draw_mode("Smooth Colored Faces");
+	add_draw_mode("Colored Vertices");
 	a = add_draw_mode("Solid Smooth");
 	a->setShortcut(QKeySequence(Key_S));
 	a->setChecked(true);

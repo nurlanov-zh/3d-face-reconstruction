@@ -8,6 +8,11 @@
 #include <spdlog/sinks/stdout_sinks.h>
 #include <spdlog/spdlog.h>
 
+#include <common/data_types.h>
+#include <pcl/io/pcd_io.h>
+#include <opencv2/opencv.hpp>
+
+#include <deque>
 #include <memory>
 
 namespace utils
@@ -15,7 +20,8 @@ namespace utils
 class DataReader
 {
    public:
-	DataReader(const std::string& path, OpenMesh::IO::Options opt);
+	DataReader(const std::string& path, OpenMesh::IO::Options opt,
+			   const int32_t sequenceId = -1);
 
 	const common::Mesh& getNeutralMesh() const { return neutralMesh_; }
 	common::Mesh& getNeutralMesh() { return neutralMesh_; }
@@ -24,10 +30,7 @@ class DataReader
 	{
 		return shapeBasis_;
 	}
-	std::vector<common::float4>& getShapeBasis()
-	{
-		return shapeBasis_;
-	}
+	std::vector<common::float4>& getShapeBasis() { return shapeBasis_; }
 
 	const std::vector<float>& getShapeBasisDev() const
 	{
@@ -57,10 +60,7 @@ class DataReader
 	{
 		return albedoBasis_;
 	}
-	std::vector<common::float4>& getAlbedoBasis()
-	{
-		return albedoBasis_;
-	}
+	std::vector<common::float4>& getAlbedoBasis() { return albedoBasis_; }
 
 	const std::vector<float>& getAlbedoBasisDev() const
 	{
@@ -71,12 +71,21 @@ class DataReader
 	const common::Mesh& getKinectMesh() const { return kinectMesh_; }
 	common::Mesh& getKinectMesh() { return kinectMesh_; }
 
-	std::vector<common::Vec2i> getCorrespondences(){ return correspondences_; }
+	std::vector<common::Vec2i> getCorrespondences() { return correspondences_; }
 	common::Mesh& getProcrustesMesh()
 	{
 		readProcrustes();
 		return procrustesMesh_;
 	}
+
+	const std::vector<size_t>& getAssignedLandmarks() const
+	{
+		return landmarkIds_;
+	}
+
+	bool isNextRGBDExists() const;
+	std::optional<std::pair<cv::Mat, pcl::PointCloud<pcl::PointXYZRGB>::Ptr>>
+	nextRGBD();
 
    private:
 	void readPCAFace();
@@ -85,6 +94,8 @@ class DataReader
 	void readKinectData();
 	void readCorrespondences();
 	void readProcrustes();
+	void readRGBD();
+	void readAssignedLandmarks();
 
 	float* loadEigenvectors(const std::string& filename,
 							unsigned int components,
@@ -101,6 +112,7 @@ class DataReader
 
 	std::string path_;
 	OpenMesh::IO::Options opt_;
+	int32_t sequenceId_;
 	common::Mesh neutralMesh_;
 	common::Mesh kinectMesh_;
 	common::Mesh procrustesMesh_;
@@ -115,5 +127,10 @@ class DataReader
 	std::vector<float> albedoBasisDev_;
 
 	std::vector<common::Vec2i> correspondences_;
+
+	std::vector<Eigen::Vector3f> pcdScan_;
+	std::deque<std::string> imageNames_;
+	std::deque<std::string> cloudNames_;
+	std::vector<size_t> landmarkIds_;
 };
 }  // namespace utils

@@ -66,34 +66,37 @@ void NRICP::findDeformation(common::Mesh& source, const common::Target& target,
 	const auto start = std::chrono::steady_clock::now();
 	for (size_t i = 0; i < params_.numOfOuterIterations; ++i)
 	{
+		for (size_t j = 0; j < 1; ++j)
 		{
-			const auto start = std::chrono::steady_clock::now();
-			
-			initTask(alphas_[i], betas_[i], source, target, correspondences);
-			
-			const auto end = std::chrono::steady_clock::now();
-			consoleLog_->debug(
-				"Task initted in: " +
-				std::to_string(
-					std::chrono::duration_cast<std::chrono::microseconds>(end -
-																		  start)
-						.count()) +
-				"mcs.");
-		}
+			{
+				const auto start = std::chrono::steady_clock::now();
 
-		{
-			const auto start = std::chrono::steady_clock::now();
-			
-			optimize(source);
+				initTask(alphas_[i], betas_[i], source, target, correspondences);
 
-			const auto end = std::chrono::steady_clock::now();
-			consoleLog_->debug(
-				"Optimized task in: " +
-				std::to_string(
-					std::chrono::duration_cast<std::chrono::microseconds>(end -
-																		  start)
-						.count()) +
-				"mcs.");
+				const auto end = std::chrono::steady_clock::now();
+				consoleLog_->debug(
+					"Task initted in: " +
+					std::to_string(
+						std::chrono::duration_cast<std::chrono::microseconds>(end -
+																			  start)
+							.count()) +
+					"mcs.");
+			}
+
+			{
+				const auto start = std::chrono::steady_clock::now();
+
+				optimize(source);
+
+				const auto end = std::chrono::steady_clock::now();
+				consoleLog_->debug(
+					"Optimized task in: " +
+					std::to_string(
+						std::chrono::duration_cast<std::chrono::microseconds>(end -
+																			  start)
+							.count()) +
+					"mcs.");
+			}
 		}
 	}
 	const auto end = std::chrono::steady_clock::now();
@@ -167,6 +170,10 @@ void NRICP::initLandmarksMatrix(
 		const auto targetPoint =
 			target.mesh.point(OpenMesh::VertexHandle(correspondences[i][1]));
 
+		// std::cout << "Point" << std::endl;
+		// std::cout << targetPoint[0] << " " << targetPoint[1] << " " << targetPoint[2] << std::endl;
+		// std::cout << sourcePoint[0] << " " << sourcePoint[1] << " " << sourcePoint[2] << std::endl;
+
 		ATriplets_[ATripletsDL_ + 4 * i] = Eigen::Triplet<float>(
 			4 * params_.numOfEdges + params_.numOfVertices + i,
 			correspondences[i][0] * 4, beta * sourcePoint[0]);
@@ -202,20 +209,18 @@ void NRICP::initDistanceMatrix(const common::Mesh& source)
 		const auto idx = vit->idx();
 		const auto point = source.point(*vit);
 		ATriplets_[ATripletsWD_ + 4 * idx] = Eigen::Triplet<float>(
-			4 * params_.numOfEdges + idx, idx * 4,
-			weights_[idx] * point[0]);
+			4 * params_.numOfEdges + idx, idx * 4, weights_[idx] * point[0]);
 
-		ATriplets_[ATripletsWD_ + 4 * idx + 1] = Eigen::Triplet<float>(
-			4 * params_.numOfEdges + idx, idx * 4 + 1,
-			weights_[idx] * point[1]);
+		ATriplets_[ATripletsWD_ + 4 * idx + 1] =
+			Eigen::Triplet<float>(4 * params_.numOfEdges + idx, idx * 4 + 1,
+								  weights_[idx] * point[1]);
 
-		ATriplets_[ATripletsWD_ + 4 * idx + 2] = Eigen::Triplet<float>(
-			4 * params_.numOfEdges + idx, idx * 4 + 2,
-			weights_[idx] * point[2]);
+		ATriplets_[ATripletsWD_ + 4 * idx + 2] =
+			Eigen::Triplet<float>(4 * params_.numOfEdges + idx, idx * 4 + 2,
+								  weights_[idx] * point[2]);
 
-		ATriplets_[ATripletsWD_ + 4 * idx + 3] =
-			Eigen::Triplet<float>(4 * params_.numOfEdges + idx,
-								  idx * 4 + 3, weights_[idx]);
+		ATriplets_[ATripletsWD_ + 4 * idx + 3] = Eigen::Triplet<float>(
+			4 * params_.numOfEdges + idx, idx * 4 + 3, weights_[idx]);
 	}
 }
 
@@ -239,26 +244,27 @@ void NRICP::initBMatrix(const common::Mesh& source,
 		// set if line segment from Xv to u intersects source
 
 		// const auto sourceNormal = source.normal(*vit);
-		// const auto targetNormal = target.mesh.normal(OpenMesh::VertexHandle(retIndex));
-
+		// const auto targetNormal =
+		// target.mesh.normal(OpenMesh::VertexHandle(retIndex));
 
 		// const auto angle = sourceNormal.dot(targetNormal);
 		// if (angle < params_.normalsThreshold)
 		// {
 		// 	weights_[idx] = 0;
 		// }
-
 		const auto idx = vit->idx();
 		const auto resPoint = target.pc->pts[retIndex];
 
-		B_(4 * params_.numOfEdges + idx, 0) =
-			weights_[idx] * resPoint.x;
+		if (outDistSqr > 0.1)
+		{
+			weights_[idx] = 0;
+		}
 
-		B_(4 * params_.numOfEdges + idx, 1) =
-			weights_[idx] * resPoint.y;
+		B_(4 * params_.numOfEdges + idx, 0) = weights_[idx] * resPoint.x;
 
-		B_(4 * params_.numOfEdges + idx, 2) =
-			weights_[idx] * resPoint.z;
+		B_(4 * params_.numOfEdges + idx, 1) = weights_[idx] * resPoint.y;
+
+		B_(4 * params_.numOfEdges + idx, 2) = weights_[idx] * resPoint.z;
 	}
 }
 
@@ -266,7 +272,8 @@ void NRICP::optimize(common::Mesh& source)
 {
 	const Eigen::SparseMatrix<float> ATA =
 		Eigen::SparseMatrix<float>(A_.transpose()) * A_;
-	const Eigen::MatrixX3f ATB = Eigen::SparseMatrix<float>(A_.transpose()) * B_;
+	const Eigen::MatrixX3f ATB =
+		Eigen::SparseMatrix<float>(A_.transpose()) * B_;
 
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>> solver;
 	solver.compute(ATA);
@@ -292,6 +299,8 @@ void NRICP::optimize(common::Mesh& source)
 		source.set_point(*vit, {pointTransformed(0), pointTransformed(1),
 								pointTransformed(2)});
 	}
+
+	std::cout << "matrix norm " << XT.norm() << std::endl;
 }
 
 }  // namespace refinement

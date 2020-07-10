@@ -118,6 +118,5 @@ std::ifstream& GotoLine(std::ifstream& file, unsigned int n)
 }
 #endif
 
-
 }  // namespace sparse
 }  // namespace matching

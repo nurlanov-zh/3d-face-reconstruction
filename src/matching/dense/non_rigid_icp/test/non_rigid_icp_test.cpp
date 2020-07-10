@@ -129,7 +129,8 @@ TEST(NRICPTest, skewCubeCase)
 	for (common::Mesh::VertexIter vit = targetMesh.vertices_begin();
 		 vit != targetMesh.vertices_end(); ++vit)
 	{
-		const auto sourcePoint = sourceMesh.point(OpenMesh::VertexHandle(vit->idx()));
+		const auto sourcePoint =
+			sourceMesh.point(OpenMesh::VertexHandle(vit->idx()));
 		const auto targetPoint = targetMesh.point(*vit);
 
 		EXPECT_FLOAT_EQ(sourcePoint[0], targetPoint[0]);

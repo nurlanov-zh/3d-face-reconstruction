@@ -1,6 +1,7 @@
 #include "data_reader/data_reader.h"
 
 #include <chrono>
+#include <experimental/filesystem>
 #include <fstream>
 
 namespace utils
@@ -15,15 +16,19 @@ const std::string ALBEDO_BASIS_NAME = "/AlbedoBasis.matrix";
 const std::string ALBEDO_BASIS_DEV_NAME = "/StandardDeviationAlbedo.vec";
 const std::string SPARSE_CORR_NAME = "/sparse.corr";
 const std::string PROCRUSTES_NAME = "/procrustes.off";
+const std::string ASSIGNED_LANDMARKS_NAME = "/assigned_landmarks.txt";
+const std::string RGBD_DIR = "/RGBD";
 
 constexpr size_t NUM_OF_EIG_SHAPE = 160;
 constexpr size_t NUM_OF_EIG_EXP = 76;
 constexpr size_t NUM_OF_VERTICES = 213960;
 constexpr size_t NUM_OF_SPARSE_CORR = 4;
-constexpr double SCALE_NEUTRAL = 1/1000000.0f;
+constexpr size_t NUM_OF_LANDMARKS = 68;
+constexpr double SCALE_NEUTRAL = 1 / 1000000.0f;
 
-DataReader::DataReader(const std::string& path, OpenMesh::IO::Options opt)
-	: path_(path), opt_(opt)
+DataReader::DataReader(const std::string& path, OpenMesh::IO::Options opt,
+					   const int32_t sequenceId)
+	: path_(path), opt_(opt), sequenceId_(sequenceId)
 {
 	consoleLog_ = spdlog::get("console");
 	errLog_ = spdlog::get("stderr");
@@ -38,11 +43,15 @@ DataReader::DataReader(const std::string& path, OpenMesh::IO::Options opt)
 
 	correspondences_.resize(NUM_OF_SPARSE_CORR);
 
+	landmarkIds_.resize(NUM_OF_LANDMARKS);
+
 	readPCAFace();
 	readExpressionsData();
 	readAlbedoData();
 	readKinectData();
 	readCorrespondences();
+	readAssignedLandmarks();
+	readRGBD();
 }
 
 void DataReader::readPCAFace()
@@ -55,6 +64,14 @@ void DataReader::readPCAFace()
 			errLog_->error("Average face is not loaded! Abort!");
 			throw std::runtime_error("Average face");
 		}
+		// scale
+		for (auto vIt = neutralMesh_.vertices_begin();
+			 vIt != neutralMesh_.vertices_end(); ++vIt)
+		{
+			OpenMesh::Vec3f newCoordinate = neutralMesh_.point(*vIt);
+			neutralMesh_.set_point(*vIt, newCoordinate * SCALE_NEUTRAL);
+		}
+
 		const auto end = std::chrono::steady_clock::now();
 		consoleLog_->info(
 			"Average face is successfully loaded in " +
@@ -63,14 +80,6 @@ void DataReader::readPCAFace()
 																	  start)
 					.count()) +
 			"ms");
-
-		// scale
-		for (auto vIt = neutralMesh_.vertices_begin();
-			 vIt != neutralMesh_.vertices_end(); ++vIt)
-		{
-			OpenMesh::Vec3f newCoordinate = neutralMesh_.point(*vIt);
-			neutralMesh_.set_point(*vIt, newCoordinate * SCALE_NEUTRAL);
-		}
 	}
 
 	{
@@ -186,11 +195,10 @@ void DataReader::readKinectData()
 	consoleLog_->info("Kinect mesh is not loaded");
 }
 
-void DataReader::readCorrespondences() 
+void DataReader::readCorrespondences()
 {
 	const auto start = std::chrono::steady_clock::now();
-	const std::string filenameCorr =
-		path_ + "/" + SPARSE_CORR_NAME;
+	const std::string filenameCorr = path_ + "/" + SPARSE_CORR_NAME;
 	loadCorrespondences(filenameCorr);
 	const auto end = std::chrono::steady_clock::now();
 	consoleLog_->info(
@@ -201,7 +209,8 @@ void DataReader::readCorrespondences()
 		"ms");
 }
 
-void DataReader::readProcrustes() {
+void DataReader::readProcrustes()
+{
 	const std::string filename = path_ + "/" + PROCRUSTES_NAME;
 	if (openMesh(filename, procrustesMesh_))
 	{
@@ -213,15 +222,15 @@ void DataReader::readProcrustes() {
 
 bool DataReader::openMesh(const std::string& filename, common::Mesh& mesh)
 {
-	mesh.request_face_normals();
-	mesh.request_face_colors();
-	mesh.request_vertex_normals();
-	mesh.request_vertex_colors();
-	mesh.request_vertex_texcoords2D();
-
 	consoleLog_->info("Loading mesh from file '" + filename + "'");
 	if (OpenMesh::IO::read_mesh(mesh, filename, opt_))
 	{
+		mesh.request_face_normals();
+		mesh.request_face_colors();
+		mesh.request_vertex_normals();
+		mesh.request_vertex_colors();
+		mesh.request_vertex_texcoords2D();
+		
 		// update face and vertex normals
 		if (!opt_.check(OpenMesh::IO::Options::FaceNormal))
 		{
@@ -271,7 +280,7 @@ bool DataReader::openMesh(const std::string& filename, common::Mesh& mesh)
 	return false;
 }
 
-void DataReader::loadCorrespondences(const std::string& filename) 
+void DataReader::loadCorrespondences(const std::string& filename)
 {
 	std::ifstream in(filename);
 
@@ -286,11 +295,11 @@ void DataReader::loadCorrespondences(const std::string& filename)
 
 	for (size_t x = 0; x < length; x++)
 	{
-		in >> correspondences_[x][1] >> correspondences_[x][0]; // kinectdata >> averageMesh
+		in >> correspondences_[x][1] >>
+			correspondences_[x][0];  // kinectdata >> averageMesh
 	}
 
 	in.close();
-
 }
 
 void DataReader::loadVector(const std::string& filename, float* res,
@@ -312,6 +321,112 @@ void DataReader::loadVector(const std::string& filename, float* res,
 	in.read((char*)(res), length * sizeof(float));
 
 	in.close();
+}
+
+void DataReader::readRGBD()
+{
+	if (sequenceId_ < 0)
+	{
+		consoleLog_->warn(
+			"RGBD scan won't be loaded. sequenceId is less than zero");
+		return;
+	}
+
+	const std::string path = path_ + "/" + RGBD_DIR;
+	std::string sequenceIdString = std::to_string(sequenceId_);
+	if (sequenceIdString.size() < 2)
+	{
+		sequenceIdString = "0" + sequenceIdString;
+	}
+
+	const std::string cloudName = sequenceIdString + "_cloud.pcd";
+	const std::string imageName = sequenceIdString + "_image.png";
+
+	for (const auto& entry :
+		 std::experimental::filesystem::directory_iterator(path))
+	{
+		{
+			const auto pos = entry.path().string().find(cloudName);
+			if (pos != std::string::npos)
+			{
+				cloudNames_.push_back(entry.path().string());
+				continue;
+			}
+		}
+
+		{
+			const auto pos = entry.path().string().find(imageName);
+			if (pos != std::string::npos)
+			{
+				imageNames_.push_back(entry.path().string());
+				continue;
+			}
+		}
+	}
+	if (imageNames_.size() != cloudNames_.size())
+	{
+		errLog_->error("Different amount of images and clouds");
+	}
+}
+
+bool DataReader::isNextRGBDExists() const
+{
+	return imageNames_.size() != 0 && cloudNames_.size() != 0;
+}
+
+std::optional<std::pair<cv::Mat, pcl::PointCloud<pcl::PointXYZRGB>::Ptr>>
+DataReader::nextRGBD()
+{
+	std::vector<Eigen::Vector3f> landmarks;
+	const auto imageName = imageNames_.front();
+	imageNames_.pop_front();
+
+	const auto cloudName = cloudNames_.front();
+	cloudNames_.pop_front();
+
+	const cv::Mat image = cv::imread(imageName, cv::IMREAD_COLOR);
+
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(
+		new pcl::PointCloud<pcl::PointXYZRGB>());
+	if (pcl::io::loadPCDFile<pcl::PointXYZRGB>(cloudName, *cloud) == -1)
+	{
+		errLog_->error("Couldn't read the pcd file: " + cloudName);
+		return {};
+	}
+
+	return std::make_optional(std::make_pair(image, cloud));
+}
+
+void DataReader::readAssignedLandmarks()
+{
+	const auto start = std::chrono::steady_clock::now();
+	const std::string filenameLandmarks = path_ + "/" + ASSIGNED_LANDMARKS_NAME;
+
+	std::ifstream in(filenameLandmarks);
+
+	if (!in)
+	{
+		errLog_->error("ERROR:\tCan not open file: " + filenameLandmarks);
+		return;
+	}
+
+	size_t length = 0;
+	in >> length;
+
+	for (size_t x = 0; x < length; x++)
+	{
+		in >> landmarkIds_[x];
+	}
+
+	in.close();
+
+	const auto end = std::chrono::steady_clock::now();
+	consoleLog_->info(
+		"Assigned landmark ids are successfully loaded in " +
+		std::to_string(
+			std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+				.count()) +
+		"ms");
 }
 
 }  // namespace utils
