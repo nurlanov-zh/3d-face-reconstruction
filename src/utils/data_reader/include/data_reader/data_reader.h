@@ -129,8 +129,8 @@ class DataReader
 	std::vector<common::Vec2i> correspondences_;
 
 	std::vector<Eigen::Vector3f> pcdScan_;
-	std::deque<std::string> imageNames_;
-	std::deque<std::string> cloudNames_;
+	std::map<size_t, std::string> imageNames_;
+	std::map<size_t, std::string> cloudNames_;
 	std::vector<size_t> landmarkIds_;
 };
 }  // namespace utils

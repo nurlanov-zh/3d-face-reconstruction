@@ -45,6 +45,10 @@
 #include "MeshViewerWidgetT.hh"
 
 #include <common/data_types.h>
+#include <data_reader/data_reader.h>
+#include <landmark_detection/face_landmark_detection.h>
+#include <non_rigid_icp/non_rigid_icp.h>
+#include <sparse/sparse_aligner.h>
 
 #include <OpenMesh/Tools/Utils/getopt.h>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
@@ -55,6 +59,7 @@
 #include <QWidget>
 
 #include <iostream>
+#include <memory>
 
 //== CLASS DEFINITION =========================================================
 
@@ -69,13 +74,12 @@ class MeshViewerWidget : public MeshViewerWidgetT<common::Mesh>
 
    public:
 	/// default constructor
-	explicit MeshViewerWidget(QWidget* parent = 0);
+	explicit MeshViewerWidget(bool sequence, const OpenMesh::IO::Options& opt,
+							  QWidget* parent = 0);
 
 	OpenMesh::IO::Options& options() { return _options; }
 	const OpenMesh::IO::Options& options() const { return _options; }
 	void setOptions(const OpenMesh::IO::Options& opts) { _options = opts; }
-
-	void open_texture_gui(QString fname);
 
    public slots:
 	void play();
@@ -83,5 +87,12 @@ class MeshViewerWidget : public MeshViewerWidgetT<common::Mesh>
 	void next_frame();
 
    private:
+	void calculateFace(common::Mesh& neutralMesh, const common::Mesh& mesh,
+					   const std::vector<common::Vec2i>& correspondences);
+
+   private:
+	bool seq_;
+	std::unique_ptr<utils::DataReader> dataReader_;
+	std::unique_ptr<matching::refinement::NRICP> nricp_;
 	OpenMesh::IO::Options _options;
 };

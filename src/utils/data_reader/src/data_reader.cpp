@@ -345,8 +345,9 @@ void DataReader::readRGBD()
 	for (const auto& entry :
 		 std::experimental::filesystem::directory_iterator(path))
 	{
+		std::string str = entry.path().string();
 		{
-			const auto pos = entry.path().string().find(sequenceIdString);
+			const auto pos = str.find(sequenceIdString);
 			if (pos == std::string::npos)
 			{
 				continue;
@@ -354,19 +355,33 @@ void DataReader::readRGBD()
 		}
 
 		{
-			const auto pos = entry.path().string().find(cloudName);
+			const auto pos = str.find(cloudName);
 			if (pos != std::string::npos)
 			{
-				cloudNames_.push_back(entry.path().string());
+				const auto kfpos = str.substr(0, pos).find("_");
+				if (pos == std::string::npos)
+				{
+					continue;
+				}
+
+				const auto kf = str.substr(kfpos + 1, pos - kfpos - 1);
+				cloudNames_[std::stoi(kf)] = str;
 				continue;
 			}
 		}
 
 		{
-			const auto pos = entry.path().string().find(imageName);
+			const auto pos = str.find(imageName);
 			if (pos != std::string::npos)
 			{
-				imageNames_.push_back(entry.path().string());
+				const auto kfpos = str.substr(0, pos).find("_");
+				if (pos == std::string::npos)
+				{
+					continue;
+				}
+
+				const auto kf = str.substr(kfpos + 1, pos - kfpos - 1);
+				imageNames_[std::stoi(kf)] = str;
 				continue;
 			}
 		}
@@ -385,22 +400,30 @@ bool DataReader::isNextRGBDExists() const
 std::optional<std::pair<cv::Mat, pcl::PointCloud<pcl::PointXYZRGB>::Ptr>>
 DataReader::nextRGBD()
 {
+	const auto start = std::chrono::steady_clock::now();
 	std::vector<Eigen::Vector3f> landmarks;
-	const auto imageName = imageNames_.front();
-	imageNames_.pop_front();
+	const auto imageName = imageNames_.begin();
+	const auto cloudName = cloudNames_.begin();
 
-	const auto cloudName = cloudNames_.front();
-	cloudNames_.pop_front();
-
-	const cv::Mat image = cv::imread(imageName, cv::IMREAD_COLOR);
+	const cv::Mat image = cv::imread(imageName->second, cv::IMREAD_COLOR);
 
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(
 		new pcl::PointCloud<pcl::PointXYZRGB>());
-	if (pcl::io::loadPCDFile<pcl::PointXYZRGB>(cloudName, *cloud) == -1)
+	if (pcl::io::loadPCDFile<pcl::PointXYZRGB>(cloudName->second, *cloud) == -1)
 	{
-		errLog_->error("Couldn't read the pcd file: " + cloudName);
+		errLog_->error("Couldn't read the pcd file: " + cloudName->second);
 		return {};
 	}
+
+	imageNames_.erase(imageName);
+	cloudNames_.erase(cloudName);
+	const auto end = std::chrono::steady_clock::now();
+	consoleLog_->debug(
+		"Next image and cloud are loaded in " +
+		std::to_string(
+			std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+				.count()) +
+		" ms");
 
 	return std::make_optional(std::make_pair(image, cloud));
 }
