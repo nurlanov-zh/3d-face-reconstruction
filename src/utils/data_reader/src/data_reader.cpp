@@ -334,17 +334,25 @@ void DataReader::readRGBD()
 
 	const std::string path = path_ + "/" + RGBD_DIR;
 	std::string sequenceIdString = std::to_string(sequenceId_);
-	if (sequenceIdString.size() < 2)
+	while (sequenceIdString.size() != 3)
 	{
 		sequenceIdString = "0" + sequenceIdString;
 	}
 
-	const std::string cloudName = sequenceIdString + "_cloud.pcd";
-	const std::string imageName = sequenceIdString + "_image.png";
+	const std::string cloudName = "_cloud.pcd";
+	const std::string imageName = "_image.png";
 
 	for (const auto& entry :
 		 std::experimental::filesystem::directory_iterator(path))
 	{
+		{
+			const auto pos = entry.path().string().find(sequenceIdString);
+			if (pos == std::string::npos)
+			{
+				continue;
+			}
+		}
+
 		{
 			const auto pos = entry.path().string().find(cloudName);
 			if (pos != std::string::npos)

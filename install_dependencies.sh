@@ -34,4 +34,6 @@ sudo apt-get install -y \
     mesa-common-dev \
     libgl1-mesa-dev \
     qt5-default \
-    qt5-qmake
+    qt5-qmake \
+    libblas-dev \
+    liblapack-old

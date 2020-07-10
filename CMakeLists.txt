@@ -6,7 +6,7 @@ include(CTest)
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules/" ${CMAKE_MODULE_PATH})
 set(EIGEN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/eigen")
 set(CERES_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/build-ceres-solver")
-set(SPDLOG_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/build-spdlog")
+set(spdlog_DIR "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/build-spdlog/install/lib/cmake/spdlog")
 set(OPENMESH_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/build-openmesh")
 set(DLIB_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/build-dlib")
 
@@ -29,10 +29,10 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "App
   set(EXTRA_WARNING_FLAGS "${EXTRA_WARNING_FLAGS} -Wno-exceptions")
 endif()
 
-set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN -std=c++17 -lstdc++fs")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -DNDEBUG -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN  -std=c++17 -lstdc++fs")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -std=c++17 -lstdc++fs")
-link_libraries(stdc++fs)
+set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN -std=c++17 -lstdc++fs -lcblas")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -DNDEBUG -g -DEIGEN_INITIALIZE_MATRICES_BY_NAN  -std=c++17 -lstdc++fs -lcblas")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -std=c++17 -lstdc++fs -lcblas")
+link_libraries(stdc++fs cblas lapack)
 
 if (MSVC)
     CMAKE_POLICY(SET CMP0100 NEW)
@@ -64,7 +64,7 @@ if(OpenCV_VERSION VERSION_LESS 3)
   set_property(TARGET OpenCV PROPERTY INTERFACE_COMPILE_DEFINITIONS DBATK_OPENCV2)
 endif()
 
-find_package(spdlog REQUIRED)
+find_package(spdlog REQUIRED CONFIG HINTS "${SPDLOG_DIR}")
 message(STATUS "Found spdlog")
 
 find_package(OpenGL REQUIRED)

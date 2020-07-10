@@ -231,7 +231,7 @@ common::Mesh::Color getRGB(float minimum, float maximum, float value)
 	const uint8_t r = static_cast<uint8_t>(std::max(0.f, 255 * (ratio - 1.f)));
 	const uint8_t b = static_cast<uint8_t>(std::max(0.f, 255 * (1.f - ratio)));
 	const uint8_t g = 255 - b - r;
-    return common::Mesh::Color(r, g, b);
+	return common::Mesh::Color(r, g, b);
 }
 
 void calculateFace(common::Mesh& neutralMesh, const common::Mesh& mesh,
@@ -272,10 +272,11 @@ void calculateFace(common::Mesh& neutralMesh, const common::Mesh& mesh,
 #ifdef VISUALIZE_PROCRUSTES_MESH
 		w.setMesh(neutralMesh);
 #endif
-		// disable corresponseces for a while. Maybe situation will change after optimization
+		// disable corresponseces for a while. Maybe situation will change after
+		// optimization
 		nricp.findDeformation(neutralMesh, target, {});
 		for (common::Mesh::VertexIter vit = neutralMesh.vertices_begin();
-		 	vit != neutralMesh.vertices_end(); ++vit)
+			 vit != neutralMesh.vertices_end(); ++vit)
 		{
 			const auto& point = neutralMesh.point(*vit);
 			const float queryPt[3] = {point[0], point[1], point[2]};
@@ -283,10 +284,14 @@ void calculateFace(common::Mesh& neutralMesh, const common::Mesh& mesh,
 			float outDistSqr;
 			nanoflann::KNNResultSet<float> resultSet(1);
 			resultSet.init(&retIndex, &outDistSqr);
-			target.kdTree->findNeighbors(resultSet, &queryPt[0],
-										 nanoflann::SearchParams(10));
+			const bool result = target.kdTree->findNeighbors(
+				resultSet, &queryPt[0], nanoflann::SearchParams(10));
 
-			neutralMesh.set_color(*vit, getRGB(0, 0.01, std::sqrt(outDistSqr)));
+			if (result)
+			{
+				neutralMesh.set_color(*vit, getRGB(0, 0.01, std::sqrt(outDistSqr)));
+			}
+
 		}
 
 		w.setMesh(mesh);
