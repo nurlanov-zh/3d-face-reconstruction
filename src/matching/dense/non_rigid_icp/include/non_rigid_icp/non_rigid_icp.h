@@ -16,6 +16,7 @@ namespace refinement
 struct NRICPParams
 {
 	size_t numOfOuterIterations = 8;
+	size_t numOfInnerIterations = 3;
 	size_t numOfEdges = 20000;
 	size_t numOfVertices = 20000;
 	size_t numOfLandmarks = 60;
@@ -24,6 +25,7 @@ struct NRICPParams
 	float alphaMin = 1;
 	float betaInit = 1;
 	float normalsThreshold = 0.97;
+	float eps = 60;
 };
 
 class NRICP
@@ -65,6 +67,8 @@ class NRICP
 	std::vector<Eigen::Triplet<float>> ATriplets_;
 	Eigen::SparseMatrix<float> A_;
 	Eigen::MatrixX3f B_;
+	Eigen::Matrix3Xf XTPrev_;
+	float norm_;
 };
 }  // namespace refinement
 }  // namespace matching

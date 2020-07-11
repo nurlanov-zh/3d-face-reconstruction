@@ -52,15 +52,20 @@
 const std::string DETECTION_MODEL_PATH =
 	"../data/detector/shape_predictor_68_face_landmarks.dat";
 
+constexpr int32_t WIDTH = 1280;
+constexpr int32_t BAR = 100;
+constexpr int32_t HEIGHT = 720;
+
 MeshViewerWidget::MeshViewerWidget(bool sequence,
 								   const OpenMesh::IO::Options& opt,
 								   QWidget* parent)
 	: MeshViewerWidgetT<common::Mesh>(parent), seq_(sequence)
 {
+	outputVideo_.open("video.avi", 0, 2, cv::Size(WIDTH, HEIGHT - BAR), true);
 	consoleLog_ = spdlog::get("console");
 	errLog_ = spdlog::get("stderr");
 
-	dataReader_.reset(new utils::DataReader("../data", opt, 10));
+	dataReader_.reset(new utils::DataReader("../data", opt, 6));
 
 	common::Mesh& neutralMesh = dataReader_->getNeutralMesh();
 	if (!neutralMesh.has_vertex_normals())
@@ -73,12 +78,37 @@ MeshViewerWidget::MeshViewerWidget(bool sequence,
 	params.numOfVertices = neutralMesh.n_vertices();
 	params.numOfLandmarks = 68;
 	params.betaInit = 1;
-	params.alphaInit = 50;
-	params.alphaMin = 1;
-	params.numOfOuterIterations = 3;
+	params.alphaInit = 1000;
+	params.alphaMin = 100;
+	params.numOfOuterIterations = 100;
 	nricp_.reset(new matching::refinement::NRICP(params));
 
 	next_frame();
+}
+
+void MeshViewerWidget::saveImage(const std::string& filename)
+{
+	cv::Mat pixels(HEIGHT - BAR, WIDTH, CV_8UC3);
+	glReadPixels(0, 0, WIDTH, HEIGHT - BAR, GL_RGB, GL_UNSIGNED_BYTE,
+				 pixels.data);
+	cv::Mat image(HEIGHT - BAR, WIDTH, CV_8UC3);
+
+	for (int y = 0; y < HEIGHT - BAR; y++)
+	{
+		for (int x = 0; x < WIDTH; x++)
+		{
+			image.at<cv::Vec3b>(y, x)[2] =
+				pixels.at<cv::Vec3b>(HEIGHT - BAR - y - 1, x)[0];
+			image.at<cv::Vec3b>(y, x)[1] =
+				pixels.at<cv::Vec3b>(HEIGHT - BAR - y - 1, x)[1];
+			image.at<cv::Vec3b>(y, x)[0] =
+				pixels.at<cv::Vec3b>(HEIGHT - BAR - y - 1, x)[2];
+		}
+	}
+
+	cv::imwrite(filename, image);
+
+	outputVideo_ << image;
 }
 
 void MeshViewerWidget::next_frame()
@@ -194,9 +224,18 @@ void MeshViewerWidget::next_frame()
 
 		kinectMesh.release_vertex_normals();
 	}
+	static int id = 0;
+	saveImage(std::to_string(id++) + ".png");
 }
 
-void MeshViewerWidget::play() {}
+void MeshViewerWidget::play()
+{
+	while (dataReader_->isNextRGBDExists())
+	{
+		next_frame();
+	}
+	outputVideo_.release();
+}
 
 common::Mesh::Color getRGB(float minimum, float maximum, float value)
 {
@@ -262,11 +301,11 @@ void MeshViewerWidget::calculateFace(
 			if (result)
 			{
 				neutralMesh.set_color(*vit,
-									  getRGB(0, 0.01, std::sqrt(outDistSqr)));
+									  getRGB(0, 10e-9, std::sqrt(outDistSqr)));
 			}
 		}
 
-		this->setMesh(mesh);
+		//this->setMesh(mesh);
 		this->setMesh(neutralMesh);
 	}
 	else

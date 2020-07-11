@@ -111,12 +111,13 @@ void MeshViewerWidgetT<M>::setupMesh()
 		}
 	}
 
+	auto pos = (bbMin + bbMax) * 0.5f;
+	pos[1] = 0;
 	// set center and radius
-	set_scene_pos((bbMin + bbMax) * 0.5f, (bbMin - bbMax).norm() * 0.5f);
+	set_scene_pos(pos, 0.1f);
 
 	// for normal display
 	normal_scale_ = (bbMax - bbMin).min() * 0.05f;
-	std::cout << normal_scale_ << std::endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -187,12 +188,12 @@ bool MeshViewerWidgetT<M>::set_texture(QImage& _texsrc)
 	glTexImage2D(GL_TEXTURE_2D,		// target
 				 0,					// level
 				 GL_RGBA,			// internal format
-				 texture.width(),   // width  (2^n)
-				 texture.height(),  // height (2^m)
+				 texture.width(),	// width  (2^n)
+				 texture.height(),	// height (2^m)
 				 0,					// border
 				 GL_RGBA,			// format
-				 GL_UNSIGNED_BYTE,  // type
-				 texture.bits());   // pointer to pixels
+				 GL_UNSIGNED_BYTE,	// type
+				 texture.bits());	// pointer to pixels
 
 	std::cout << "Texture loaded\n";
 	return true;
@@ -256,7 +257,7 @@ void MeshViewerWidgetT<M>::draw_openmesh(const std::string& _draw_mode)
 		}
 
 		else if (_draw_mode ==
-				 "Solid Flat")  // -------------------------------------
+				 "Solid Flat")	// -------------------------------------
 		{
 			glBegin(GL_TRIANGLES);
 			for (; fIt != fEnd; ++fIt)
@@ -346,7 +347,7 @@ void MeshViewerWidgetT<M>::draw_openmesh(const std::string& _draw_mode)
 		}
 
 		else if (_draw_mode ==
-				 "Solid Colored Faces")  // -----------------------------
+				 "Solid Colored Faces")	 // -----------------------------
 		{
 			glEnableClientState(GL_VERTEX_ARRAY);
 			glVertexPointer(3, GL_FLOAT, 0, mesh.points());
@@ -400,7 +401,7 @@ void MeshViewerWidgetT<M>::draw_openmesh(const std::string& _draw_mode)
 		}
 
 		else if (_draw_mode ==
-				 "Points")  // -----------------------------------------
+				 "Points")	// -----------------------------------------
 		{
 			glEnableClientState(GL_VERTEX_ARRAY);
 			glVertexPointer(3, GL_FLOAT, 0, mesh.points());
@@ -511,7 +512,7 @@ void MeshViewerWidgetT<M>::draw_scene(const std::string& _draw_mode)
 			typename Mesh::VertexIter vit;
 			glDisable(GL_LIGHTING);
 			glBegin(GL_LINES);
-			glColor3f(1.000f, 0.803f, 0.027f);  // orange
+			glColor3f(1.000f, 0.803f, 0.027f);	// orange
 			for (vit = mesh.vertices_begin(); vit != mesh.vertices_end(); ++vit)
 			{
 				glVertex(*vit, mesh);
@@ -525,7 +526,7 @@ void MeshViewerWidgetT<M>::draw_scene(const std::string& _draw_mode)
 			typename Mesh::FaceIter fit;
 			glDisable(GL_LIGHTING);
 			glBegin(GL_LINES);
-			glColor3f(0.705f, 0.976f, 0.270f);  // greenish
+			glColor3f(0.705f, 0.976f, 0.270f);	// greenish
 			for (fit = mesh.faces_begin(); fit != mesh.faces_end(); ++fit)
 			{
 				glVertex(mesh.property(fp_normal_base_, *fit));
@@ -634,6 +635,7 @@ void MeshViewerWidgetT<M>::setMesh(const Mesh& mesh)
 {
 	meshes_.push_back(mesh);
 	setupMesh();
+	updateGL();
 }
 
 template <typename M>

@@ -50,6 +50,10 @@ NRICP::NRICP(const NRICPParams& params) : params_(params)
 		4 * params_.numOfEdges + params_.numOfVertices + params_.numOfLandmarks,
 		3);
 
+	XTPrev_ = Eigen::Matrix3Xf(4 * params_.numOfVertices, 3);
+	XTPrev_.setZero();
+	norm_ = 10e10;
+
 	const auto end = std::chrono::steady_clock::now();
 
 	consoleLog_->debug(
@@ -66,19 +70,21 @@ void NRICP::findDeformation(common::Mesh& source, const common::Target& target,
 	const auto start = std::chrono::steady_clock::now();
 	for (size_t i = 0; i < params_.numOfOuterIterations; ++i)
 	{
-		for (size_t j = 0; j < 1; ++j)
+		size_t iter = 0;
+		do
 		{
 			{
 				const auto start = std::chrono::steady_clock::now();
 
-				initTask(alphas_[i], betas_[i], source, target, correspondences);
+				initTask(alphas_[i], betas_[i], source, target,
+						 correspondences);
 
 				const auto end = std::chrono::steady_clock::now();
 				consoleLog_->debug(
 					"Task initted in: " +
 					std::to_string(
-						std::chrono::duration_cast<std::chrono::microseconds>(end -
-																			  start)
+						std::chrono::duration_cast<std::chrono::microseconds>(
+							end - start)
 							.count()) +
 					"mcs.");
 			}
@@ -92,12 +98,13 @@ void NRICP::findDeformation(common::Mesh& source, const common::Target& target,
 				consoleLog_->debug(
 					"Optimized task in: " +
 					std::to_string(
-						std::chrono::duration_cast<std::chrono::microseconds>(end -
-																			  start)
+						std::chrono::duration_cast<std::chrono::microseconds>(
+							end - start)
 							.count()) +
 					"mcs.");
 			}
-		}
+			iter++;
+		} while (norm_ > params_.eps && iter < params_.numOfInnerIterations);
 	}
 	const auto end = std::chrono::steady_clock::now();
 	consoleLog_->debug(
@@ -170,10 +177,6 @@ void NRICP::initLandmarksMatrix(
 		const auto targetPoint =
 			target.mesh.point(OpenMesh::VertexHandle(correspondences[i][1]));
 
-		// std::cout << "Point" << std::endl;
-		// std::cout << targetPoint[0] << " " << targetPoint[1] << " " << targetPoint[2] << std::endl;
-		// std::cout << sourcePoint[0] << " " << sourcePoint[1] << " " << sourcePoint[2] << std::endl;
-
 		ATriplets_[ATripletsDL_ + 4 * i] = Eigen::Triplet<float>(
 			4 * params_.numOfEdges + params_.numOfVertices + i,
 			correspondences[i][0] * 4, beta * sourcePoint[0]);
@@ -236,8 +239,20 @@ void NRICP::initBMatrix(const common::Mesh& source,
 		float outDistSqr;
 		nanoflann::KNNResultSet<float> resultSet(1);
 		resultSet.init(&retIndex, &outDistSqr);
-		target.kdTree->findNeighbors(resultSet, &queryPt[0],
-									 nanoflann::SearchParams(10));
+		const bool found = target.kdTree->findNeighbors(
+			resultSet, &queryPt[0], nanoflann::SearchParams(10));
+		
+		const auto idx = vit->idx();
+		common::PointCloud::Point resPoint = {};
+		if (!found)
+		{
+			weights_[idx] = 0;
+		}
+		else
+		{
+			resPoint = target.pc->pts[retIndex];
+		}
+		
 
 		// set weights of border vertices to zero
 		// set weights if angle between normals above threshold to zero
@@ -252,8 +267,6 @@ void NRICP::initBMatrix(const common::Mesh& source,
 		// {
 		// 	weights_[idx] = 0;
 		// }
-		const auto idx = vit->idx();
-		const auto resPoint = target.pc->pts[retIndex];
 
 		if (outDistSqr > 0.1)
 		{
@@ -300,7 +313,8 @@ void NRICP::optimize(common::Mesh& source)
 								pointTransformed(2)});
 	}
 
-	std::cout << "matrix norm " << XT.norm() << std::endl;
+	norm_ = (XTPrev_ - XT).norm();
+	XTPrev_ = XT;
 }
 
 }  // namespace refinement

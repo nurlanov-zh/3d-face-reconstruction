@@ -90,9 +90,12 @@ class MeshViewerWidget : public MeshViewerWidgetT<common::Mesh>
 	void calculateFace(common::Mesh& neutralMesh, const common::Mesh& mesh,
 					   const std::vector<common::Vec2i>& correspondences);
 
+	void saveImage(const std::string& filename);
+
    private:
 	bool seq_;
 	std::unique_ptr<utils::DataReader> dataReader_;
 	std::unique_ptr<matching::refinement::NRICP> nricp_;
 	OpenMesh::IO::Options _options;
+	cv::VideoWriter outputVideo_;
 };
