@@ -96,6 +96,7 @@ class MeshViewerWidget : public MeshViewerWidgetT<common::Mesh>
 	bool seq_;
 	std::unique_ptr<utils::DataReader> dataReader_;
 	std::unique_ptr<matching::refinement::NRICP> nricp_;
+	std::unique_ptr<matching::optimize::FaceModel> faceModel_;
 	OpenMesh::IO::Options _options;
 	cv::VideoWriter outputVideo_;
 };

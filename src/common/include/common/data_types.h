@@ -22,13 +22,10 @@ struct MeshViewerWidgetTraits : public OpenMesh::DefaultTraits
 {
 	HalfedgeAttributes(OpenMesh::Attributes::PrevHalfedge);
 
-	FaceAttributes (
-		OpenMesh::Attributes::Normal |
-		OpenMesh::Attributes::Color);
+	FaceAttributes(OpenMesh::Attributes::Normal | OpenMesh::Attributes::Color);
 
-	VertexAttributes (
-		OpenMesh::Attributes::Normal |
-		OpenMesh::Attributes::Color);
+	VertexAttributes(OpenMesh::Attributes::Normal |
+					 OpenMesh::Attributes::Color);
 };
 
 typedef OpenMesh::TriMesh_ArrayKernelT<MeshViewerWidgetTraits> Mesh;

@@ -36,4 +36,4 @@ sudo apt-get install -y \
     qt5-default \
     qt5-qmake \
     libblas-dev \
-    liblapack-old
+    liblapack-dev

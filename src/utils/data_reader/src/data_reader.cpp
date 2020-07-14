@@ -230,7 +230,7 @@ bool DataReader::openMesh(const std::string& filename, common::Mesh& mesh)
 		mesh.request_vertex_normals();
 		mesh.request_vertex_colors();
 		mesh.request_vertex_texcoords2D();
-		
+
 		// update face and vertex normals
 		if (!opt_.check(OpenMesh::IO::Options::FaceNormal))
 		{

@@ -81,7 +81,7 @@ MeshViewerWidget::MeshViewerWidget(bool sequence,
 	params.alphaInit = 1000;
 	params.alphaMin = 100;
 	params.numOfOuterIterations = 100;
-	nricp_.reset(new matching::refinement::NRICP(params));
+	//	nricp_.reset(new matching::refinement::NRICP(params));
 
 	next_frame();
 }
@@ -114,6 +114,15 @@ void MeshViewerWidget::saveImage(const std::string& filename)
 void MeshViewerWidget::next_frame()
 {
 	common::Mesh neutralMesh = dataReader_->getNeutralMesh();
+
+	std::vector<common::float4> shapeBasis = dataReader_->getShapeBasis();
+	std::vector<float> shapeBasisDev = dataReader_->getShapeBasisDev();
+
+	std::vector<common::float4> expressionsBasis =
+		dataReader_->getExpressionsBasis();
+	std::vector<float> expressionsBasisDev =
+		dataReader_->getExpressionsBasisDev();
+
 	if (!neutralMesh.has_vertex_normals())
 	{
 		neutralMesh.request_vertex_normals();
@@ -283,6 +292,8 @@ void MeshViewerWidget::calculateFace(
 #ifdef VISUALIZE_PROCRUSTES_MESH
 		w.setMesh(neutralMesh);
 #endif
+		// Optimize face model params
+
 		// disable corresponseces for a while. Maybe situation will change after
 		// optimization
 		nricp_->findDeformation(neutralMesh, target, {});
@@ -305,7 +316,7 @@ void MeshViewerWidget::calculateFace(
 			}
 		}
 
-		//this->setMesh(mesh);
+		// this->setMesh(mesh);
 		this->setMesh(neutralMesh);
 	}
 	else
