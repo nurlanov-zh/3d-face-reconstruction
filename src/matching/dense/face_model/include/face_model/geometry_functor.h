@@ -51,7 +51,10 @@ struct geomFunctor
 		std::cout << "vertices: " << vertices.rows() << ", " << vertices.cols()
 				  << std::endl;
 
-		sResiduals[0] = T(0);
+		for (size_t i = 0; i < target_.mesh.n_vertices(); i++)
+		{
+			sResiduals[i] = T(10);
+		}
 
 #pragma omp parallel for
 		for (size_t i = 0; i < matching::optimize::NUM_OF_VERTICES; i++)
@@ -59,6 +62,8 @@ struct geomFunctor
 			Eigen::Vector<T, 3> vertex = vertices.block(0, i, 3, 1);
 			vertex = transform * (poseInitRot_.cast<T>() * vertex +
 								  poseInitTrans_.cast<T>());
+
+//			vertex = transform * vertex;
 
 			float queryPt[3];
 			if constexpr (std::is_same<T, double>::value)
@@ -90,20 +95,14 @@ struct geomFunctor
 					(T(resPoint.y) - vertex(1)) * (T(resPoint.y) - vertex(1));
 				dist +=
 					(T(resPoint.z) - vertex(2)) * (T(resPoint.z) - vertex(2));
-				if constexpr (std::is_same<T, double>::value)
-				{
-					std::cout << i << " , " << retIndex << ": " << dist
-							  << std::endl;
-				}
-				else
-				{
-					std::cout << i << " , " << retIndex << ": " << dist.a
-							  << std::endl;
-				}
-				if (dist < T(threshold_))
-				{
-					sResiduals[0] += dist;
-				}
+
+//				if (dist < T(threshold_))
+//				{
+					if (dist < sResiduals[retIndex])
+					{
+						sResiduals[retIndex] = dist;
+					}
+//				}
 			}
 		}
 		return true;

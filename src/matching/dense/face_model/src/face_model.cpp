@@ -93,12 +93,13 @@ void FaceModel::optimize(common::Mesh& neutralMesh,
 							  se3_param);
 
 	ceres::CostFunction* cost_function =
-		new ceres::AutoDiffCostFunction<geomFunctor, 1, NUM_OF_EIG_SHAPE,
+		new ceres::AutoDiffCostFunction<geomFunctor, ceres::DYNAMIC, NUM_OF_EIG_SHAPE,
 										NUM_OF_EIG_EXP,
 										Sophus::SE3d::num_parameters>(
 			new geomFunctor(shapeBasis_, shapeBasisDev_, expressionsBasis_,
 							expressionsBasisDev_, neutralShape_, target,
-							correspondences, poseInit.cast<double>()));
+							correspondences, poseInit.cast<double>()),
+			target.mesh.n_vertices());
 
 	std::cout << "There are " << target.mesh.n_vertices() << " target points"
 			  << std::endl;
