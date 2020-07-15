@@ -93,13 +93,18 @@ void FaceModel::optimize(common::Mesh& neutralMesh,
 							  se3_param);
 
 	ceres::CostFunction* cost_function =
-		new ceres::AutoDiffCostFunction<geomFunctor, ceres::DYNAMIC,
-										NUM_OF_EIG_SHAPE, NUM_OF_EIG_EXP,
+		new ceres::AutoDiffCostFunction<geomFunctor, 1, NUM_OF_EIG_SHAPE,
+										NUM_OF_EIG_EXP,
 										Sophus::SE3d::num_parameters>(
 			new geomFunctor(shapeBasis_, shapeBasisDev_, expressionsBasis_,
-							expressionsBasisDev_, neutralShape_, target.mesh,
-							correspondences),
-			target.mesh.n_vertices());
+							expressionsBasisDev_, neutralShape_, target,
+							correspondences, poseInit.cast<double>()));
+
+	std::cout << "There are " << target.mesh.n_vertices() << " target points"
+			  << std::endl;
+
+	std::cout << "There are " << matching::optimize::NUM_OF_VERTICES
+			  << " vertices on mesh" << std::endl;
 
 	problem.AddResidualBlock(cost_function,
 							 new ceres::HuberLoss(params_.huber_parameter),
@@ -123,6 +128,35 @@ void FaceModel::optimize(common::Mesh& neutralMesh,
 		case 2:
 			std::cout << summary.FullReport() << std::endl;
 			break;
+	}
+
+	applyToMesh(neutralMesh, poseInit.cast<double>());
+}
+
+void FaceModel::applyToMesh(common::Mesh& mesh,
+							const common::Matrix4d& poseInit)
+{
+	Eigen::Matrix3d poseInitRot_;
+	Eigen::Vector3d poseInitTrans_;
+	poseInitRot_ = poseInit.block(0, 0, 3, 3);
+	poseInitTrans_ = poseInit.block(0, 3, 3, 1);
+
+	size_t i = 0;
+	for (common::Mesh::VertexIter vit = mesh.vertices_begin();
+		 vit != mesh.vertices_end(); i++, vit++)
+	{
+		Eigen::Vector3d vertex =
+			neutralShape_.block(3 * i, 0, 3, 1) +
+			shapeBasis_.block(3 * i, 0, 3,
+							  matching::optimize::NUM_OF_EIG_SHAPE) *
+				shapeBasisCoefs_ +
+			expressionsBasis_.block(3 * i, 0, 3,
+									matching::optimize::NUM_OF_EIG_EXP) *
+				expressionsBasisCoefs_;
+
+		vertex = transform_ * (poseInitRot_ * vertex + poseInitTrans_);
+
+		mesh.set_point(*vit, {vertex(0), vertex(1), vertex(2)});
 	}
 }
 

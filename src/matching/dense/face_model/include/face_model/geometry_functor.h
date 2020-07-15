@@ -13,8 +13,9 @@ struct geomFunctor
 			&expressionsBasis,
 		const Eigen::Vector<double, Eigen::Dynamic> &expressionsBasisDev,
 		const Eigen::Vector<double, Eigen::Dynamic> &neutralShape,
-		const common::Mesh &targetMesh,
-		const std::vector<common::Vec2i> &correspondences);
+		const common::Target &target,
+		const std::vector<common::Vec2i> &correspondences,
+		const Eigen::Matrix4d &poseInit);
 
 	template <typename T>
 	bool operator()(const T *sShapeBasisCoefs, const T *sExpressionsBasisCoefs,
@@ -28,49 +29,82 @@ struct geomFunctor
 			Eigen::Matrix<T, matching::optimize::NUM_OF_EIG_EXP, 1> const> const
 			expressionsBasisCoefs(sExpressionsBasisCoefs);
 
-		auto preVertices = neutralShape_.cast<T>() +
-						   shapeBasis_.cast<T>() * shapeBasisCoefs +
-						   expressionsBasis_.cast<T>() * expressionsBasisCoefs;
+		Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> vertices;
+		vertices.resize(3, matching::optimize::NUM_OF_VERTICES);
 
-		std::cout << "preVert: " << preVertices.rows() << ", "
-				  << preVertices.cols() << std::endl;
-		size_t vertId = 0;
-		for (common::Mesh::VertexIter vit = targetMesh_.vertices_begin();
-			 vit != targetMesh_.vertices_end(); ++vertId, ++vit)
+#pragma omp parallel for
+		for (size_t i = 0; i < matching::optimize::NUM_OF_VERTICES; i++)
 		{
-			std::cout << "im inside!" << std::endl;
-			T bestDist = T(1e8);
-			int bestId = -1;
-			const auto point = targetMesh_.point(*vit);
-			std::cout << "Point: " << point[0] << ", " << point[1] << ", "
-					  << point[2] << std::endl;
-			std::cout << preVertices << std::endl;
+			vertices.block(0, i, 3, 1) =
+				neutralShape_.block(3 * i, 0, 3, 1).cast<T>() +
+				shapeBasis_
+						.block(3 * i, 0, 3,
+							   matching::optimize::NUM_OF_EIG_SHAPE)
+						.cast<T>() *
+					shapeBasisCoefs +
+				expressionsBasis_
+						.block(3 * i, 0, 3, matching::optimize::NUM_OF_EIG_EXP)
+						.cast<T>() *
+					expressionsBasisCoefs;
+		}
 
-			for (size_t i = 0; i < matching::optimize::NUM_OF_VERTICES; i++)
+		std::cout << "vertices: " << vertices.rows() << ", " << vertices.cols()
+				  << std::endl;
+
+		sResiduals[0] = T(0);
+
+#pragma omp parallel for
+		for (size_t i = 0; i < matching::optimize::NUM_OF_VERTICES; i++)
+		{
+			Eigen::Vector<T, 3> vertex = vertices.block(0, i, 3, 1);
+			vertex = transform * (poseInitRot_.cast<T>() * vertex +
+								  poseInitTrans_.cast<T>());
+
+			float queryPt[3];
+			if constexpr (std::is_same<T, double>::value)
 			{
+				queryPt[0] = static_cast<float>(vertex(0));
+				queryPt[1] = static_cast<float>(vertex(1));
+				queryPt[2] = static_cast<float>(vertex(2));
+			}
+			else
+			{
+				queryPt[0] = static_cast<float>(vertex(0).a);
+				queryPt[1] = static_cast<float>(vertex(1).a);
+				queryPt[2] = static_cast<float>(vertex(2).a);
+			}
+			size_t retIndex;
+			float outDistSqr;
+			nanoflann::KNNResultSet<float> resultSet(1);
+			resultSet.init(&retIndex, &outDistSqr);
+			const bool result = target_.kdTree->findNeighbors(
+				resultSet, &queryPt[0], nanoflann::SearchParams(10));
+
+			if (result)
+			{
+				auto resPoint = target_.pc->pts[retIndex];
 				T dist = T(0);
-				std::cout << "1" << std::endl;
-				std::cout << preVertices(0, 0) << ", " << preVertices(1, 0)
-						  << preVertices(2, 0) << std::endl;
-
-				std::cout << "2" << std::endl;
-				std::cout << preVertices.block(3 * i, 0, 3, 1) << std::endl;
-				Eigen::Vector<T, 3> vertex = preVertices.block(3 * i, 0, 3, 1);
-				std::cout << "vertex: " << vertex << std::endl;
-				vertex = transform * vertex;
-				std::cout << "vertex after: " << vertex << std::endl;
-
-				dist += ceres::pow(T(point[0]) - vertex(0), 2);
-				dist += ceres::pow(T(point[1]) - vertex(1), 2);
-				dist += ceres::pow(T(point[2]) - vertex(2), 2);
-				if (dist < bestDist)
+				dist +=
+					(T(resPoint.x) - vertex(0)) * (T(resPoint.x) - vertex(0));
+				dist +=
+					(T(resPoint.y) - vertex(1)) * (T(resPoint.y) - vertex(1));
+				dist +=
+					(T(resPoint.z) - vertex(2)) * (T(resPoint.z) - vertex(2));
+				if constexpr (std::is_same<T, double>::value)
 				{
-					bestDist = dist;
-					bestId = i;
-					std::cout << "Best dist: " << bestDist << std::endl;
+					std::cout << i << " , " << retIndex << ": " << dist
+							  << std::endl;
+				}
+				else
+				{
+					std::cout << i << " , " << retIndex << ": " << dist.a
+							  << std::endl;
+				}
+				if (dist < T(threshold_))
+				{
+					sResiduals[0] += dist;
 				}
 			}
-			sResiduals[vertId] = bestDist;
 		}
 		return true;
 	}
@@ -79,8 +113,11 @@ struct geomFunctor
 	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> expressionsBasis_;
 	Eigen::Vector<double, Eigen::Dynamic> expressionsBasisDev_;
 	Eigen::Vector<double, Eigen::Dynamic> neutralShape_;
-	common::Mesh targetMesh_;
+	common::Target target_;
 	std::vector<common::Vec2i> correspondences_;
+	Eigen::Matrix3d poseInitRot_;
+	Eigen::Vector3d poseInitTrans_;
+	double threshold_ = 10;
 };
 
 geomFunctor::geomFunctor(
@@ -90,14 +127,17 @@ geomFunctor::geomFunctor(
 		&expressionsBasis,
 	const Eigen::Vector<double, -1> &expressionsBasisDev,
 	const Eigen::Vector<double, Eigen::Dynamic> &neutralShape,
-	const common::Mesh &targetMesh,
-	const std::vector<common::Vec2i> &correspondences)
+	const common::Target &target,
+	const std::vector<common::Vec2i> &correspondences,
+	const Eigen::Matrix4d &poseInit)
 	: shapeBasis_(shapeBasis),
 	  shapeBasisDev_(shapeBasisDev),
 	  expressionsBasis_(expressionsBasis),
 	  expressionsBasisDev_(expressionsBasisDev),
 	  neutralShape_(neutralShape),
-	  targetMesh_(targetMesh),
+	  target_(target),
 	  correspondences_(correspondences)
 {
+	poseInitRot_ = poseInit.block(0, 0, 3, 3);
+	poseInitTrans_ = poseInit.block(0, 3, 3, 1);
 }
