@@ -106,6 +106,36 @@ bool alignSparse(common::Mesh& sourceMesh, const common::Mesh& targetMesh,
 	return true;
 }
 
+common::Matrix4f estimatePose(const common::Mesh& sourceMesh,
+							  const common::Mesh& targetMesh,
+							  const std::vector<common::Vec2i>& correspondences)
+{
+	std::vector<common::Vector3f> sourcePoints;
+	std::vector<common::Vector3f> targetPoints;
+
+	for (size_t i = 0; i < correspondences.size(); i++)
+	{
+		const auto sourcePoint =
+			sourceMesh.point(OpenMesh::VertexHandle(correspondences[i][0]));
+		const auto targetPoint =
+			targetMesh.point(OpenMesh::VertexHandle(correspondences[i][1]));
+
+		sourcePoints.push_back(
+			common::Vector3f(sourcePoint[0], sourcePoint[1], sourcePoint[2]));
+
+		targetPoints.push_back(
+			common::Vector3f(targetPoint[0], targetPoint[1], targetPoint[2]));
+	}
+
+	common::Matrix4f estimatedPose = estimatePose(sourcePoints, targetPoints);
+
+	// Print estimatedPose in Debug
+	std::stringstream ss;
+	ss << estimatedPose;
+	spdlog::get("console")->debug(ss.str());
+	return estimatedPose;
+}
+
 #if VISUALIZE_PROCRUSTES_MESH
 std::ifstream& GotoLine(std::ifstream& file, unsigned int n)
 {

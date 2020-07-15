@@ -44,6 +44,7 @@
 //== INCLUDES =================================================================
 
 #include "MeshViewerWidget.hh"
+#include "../../matching/dense/face_model/include/face_model/face_model.h"
 
 //== IMPLEMENTATION ==========================================================
 
@@ -81,7 +82,16 @@ MeshViewerWidget::MeshViewerWidget(bool sequence,
 	params.alphaInit = 1000;
 	params.alphaMin = 100;
 	params.numOfOuterIterations = 100;
+
 	//	nricp_.reset(new matching::refinement::NRICP(params));
+
+	matching::optimize::FaceModelParams faceModelParams;
+
+	faceModel_.reset(new matching::optimize::FaceModel(faceModelParams));
+	faceModel_->setShapeBasis(dataReader_->getShapeBasis());
+	faceModel_->setShapeBasisDev(dataReader_->getShapeBasisDev());
+	faceModel_->setExpressionsBasis(dataReader_->getExpressionsBasis());
+	faceModel_->setExpressionsBasisDev(dataReader_->getExpressionsBasisDev());
 
 	next_frame();
 }
@@ -114,14 +124,6 @@ void MeshViewerWidget::saveImage(const std::string& filename)
 void MeshViewerWidget::next_frame()
 {
 	common::Mesh neutralMesh = dataReader_->getNeutralMesh();
-
-	std::vector<common::float4> shapeBasis = dataReader_->getShapeBasis();
-	std::vector<float> shapeBasisDev = dataReader_->getShapeBasisDev();
-
-	std::vector<common::float4> expressionsBasis =
-		dataReader_->getExpressionsBasis();
-	std::vector<float> expressionsBasisDev =
-		dataReader_->getExpressionsBasisDev();
 
 	if (!neutralMesh.has_vertex_normals())
 	{
@@ -283,8 +285,13 @@ void MeshViewerWidget::calculateFace(
 	target.pc = cloud;
 	target.mesh = mesh;
 
-	const bool procrustesResult =
-		matching::sparse::alignSparse(neutralMesh, mesh, correspondences);
+	//	const bool procrustesResult =
+	//		matching::sparse::alignSparse(neutralMesh, mesh, correspondences);
+
+	common::Matrix4f poseInit =
+		matching::sparse::estimatePose(neutralMesh, mesh, correspondences);
+	bool procrustesResult = true;
+	faceModel_->optimize(neutralMesh, target, correspondences, poseInit);
 
 	this->clearMeshes();
 	if (procrustesResult)
@@ -292,11 +299,9 @@ void MeshViewerWidget::calculateFace(
 #ifdef VISUALIZE_PROCRUSTES_MESH
 		w.setMesh(neutralMesh);
 #endif
-		// Optimize face model params
-
 		// disable corresponseces for a while. Maybe situation will change after
 		// optimization
-		nricp_->findDeformation(neutralMesh, target, {});
+		//		nricp_->findDeformation(neutralMesh, target, {});
 		for (common::Mesh::VertexIter vit = neutralMesh.vertices_begin();
 			 vit != neutralMesh.vertices_end(); ++vit)
 		{
