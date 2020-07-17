@@ -93,13 +93,14 @@ void FaceModel::optimize(common::Mesh& neutralMesh,
 							  se3_param);
 
 	ceres::CostFunction* cost_function =
-		new ceres::AutoDiffCostFunction<geomFunctor, ceres::DYNAMIC, NUM_OF_EIG_SHAPE,
-										NUM_OF_EIG_EXP,
+		new ceres::AutoDiffCostFunction<geomFunctor, ceres::DYNAMIC,
+										NUM_OF_EIG_SHAPE, NUM_OF_EIG_EXP,
 										Sophus::SE3d::num_parameters>(
 			new geomFunctor(shapeBasis_, shapeBasisDev_, expressionsBasis_,
-							expressionsBasisDev_, neutralShape_, target,
+							expressionsBasisDev_, neutralShape_, neutralMesh, target,
 							correspondences, poseInit.cast<double>()),
-			target.mesh.n_vertices());
+			2 * target.mesh.n_vertices() + correspondences.size() +
+				matching::optimize::NUM_OF_EIG_SHAPE + matching::optimize::NUM_OF_EIG_EXP);
 
 	std::cout << "There are " << target.mesh.n_vertices() << " target points"
 			  << std::endl;
@@ -108,14 +109,14 @@ void FaceModel::optimize(common::Mesh& neutralMesh,
 			  << " vertices on mesh" << std::endl;
 
 	problem.AddResidualBlock(cost_function,
-							 new ceres::HuberLoss(params_.huber_parameter),
+							 nullptr,
 							 shapeBasisCoefs_.data(),
 							 expressionsBasisCoefs_.data(), transform_.data());
 
 	// Solve
 	ceres::Solver::Options ceres_options;
 	ceres_options.max_num_iterations = params_.max_num_iterations;
-	ceres_options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
+	ceres_options.linear_solver_type = ceres::DENSE_QR;
 	ceres_options.num_threads = 1;
 	ceres::Solver::Summary summary;
 
@@ -130,6 +131,17 @@ void FaceModel::optimize(common::Mesh& neutralMesh,
 			std::cout << summary.FullReport() << std::endl;
 			break;
 	}
+
+//	int idx = 4;
+//	expressionsBasisCoefs_(idx) = expressionsBasisDev_(idx);
+//
+//
+//	std::cout << "Shape coefs Dev: " << shapeBasisDev_.transpose() << std::endl;
+//	std::cout << "Expr coefs Dev: " << expressionsBasisDev_.transpose() << std::endl;
+
+	std::cout << "Results: " << std::endl;
+	std::cout << "Shape coefs: " << shapeBasisCoefs_.transpose() << std::endl;
+	std::cout << "Expr coefs: " << expressionsBasisCoefs_.transpose() << std::endl;
 
 	applyToMesh(neutralMesh, poseInit.cast<double>());
 }
