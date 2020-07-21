@@ -46,6 +46,7 @@
 
 #include <common/data_types.h>
 #include <data_reader/data_reader.h>
+#include <face_model/face_model.h>
 #include <landmark_detection/face_landmark_detection.h>
 #include <non_rigid_icp/non_rigid_icp.h>
 #include <sparse/sparse_aligner.h>
@@ -101,7 +102,8 @@ class MeshViewerWidget : public MeshViewerWidgetT<common::Mesh>
    private:
 	bool seq_;
 	std::unique_ptr<utils::DataReader> dataReader_;
-	std::unique_ptr<matching::refinement::NRICP> nricp_;
+	//	std::unique_ptr<matching::refinement::NRICP> nricp_;
+	std::unique_ptr<matching::optimize::FaceModel> faceModel_;
 	OpenMesh::IO::Options _options;
 	cv::VideoWriter outputVideo_;
 	Sophus::SE3d imageToDepth_;

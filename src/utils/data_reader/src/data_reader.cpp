@@ -6,26 +6,6 @@
 
 namespace utils
 {
-const std::string NEUTRAL_FACE_NAME = "/averageMesh.off";
-const std::string KINECT_DATA_NAME = "/kinectdata.off";
-const std::string SHAPE_BASIS_NAME = "/ShapeBasis.matrix";
-const std::string SHAPE_BASIS_DEV_NAME = "/StandardDeviationShape.vec";
-const std::string EXP_BASIS_NAME = "/ExpressionBasis.matrix";
-const std::string EXP_BASIS_DEV_NAME = "/StandardDeviationExpression.vec";
-const std::string ALBEDO_BASIS_NAME = "/AlbedoBasis.matrix";
-const std::string ALBEDO_BASIS_DEV_NAME = "/StandardDeviationAlbedo.vec";
-const std::string SPARSE_CORR_NAME = "/sparse.corr";
-const std::string PROCRUSTES_NAME = "/procrustes.off";
-const std::string ASSIGNED_LANDMARKS_NAME = "/assigned_landmarks.txt";
-const std::string RGBD_DIR = "/RGBD";
-const std::string REALSENSE_DIR = "/RealSense";
-
-constexpr size_t NUM_OF_EIG_SHAPE = 160;
-constexpr size_t NUM_OF_EIG_EXP = 76;
-constexpr size_t NUM_OF_VERTICES = 213960;
-constexpr size_t NUM_OF_SPARSE_CORR = 4;
-constexpr size_t NUM_OF_LANDMARKS = 68;
-constexpr double SCALE_NEUTRAL = 1 / 1000000.0f;
 
 DataReader::DataReader(const std::string& path, OpenMesh::IO::Options opt,
 					   const int32_t sequenceId)

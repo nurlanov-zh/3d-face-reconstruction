@@ -45,6 +45,7 @@
 
 #include "MeshViewerWidget.hh"
 #include <unordered_set>
+#include "face_model/face_model.h"
 
 //== IMPLEMENTATION ==========================================================
 
@@ -89,6 +90,16 @@ MeshViewerWidget::MeshViewerWidget(bool sequence,
 	params.numOfOuterIterations = 10;
 	nricp_.reset(new matching::refinement::NRICP(params));
 
+	//	nricp_.reset(new matching::refinement::NRICP(params));
+
+	matching::optimize::FaceModelParams faceModelParams;
+
+	faceModel_.reset(new matching::optimize::FaceModel(faceModelParams));
+	faceModel_->setShapeBasis(dataReader_->getShapeBasis());
+	faceModel_->setShapeBasisDev(dataReader_->getShapeBasisDev());
+	faceModel_->setExpressionsBasis(dataReader_->getExpressionsBasis());
+	faceModel_->setExpressionsBasisDev(dataReader_->getExpressionsBasisDev());
+
 	Eigen::Vector3d trans = {-0.00356676848605, 0.0257014129311,
 							 0.00136031582952};
 	const Eigen::Quaterniond q = Eigen::Quaterniond(
@@ -127,6 +138,7 @@ void MeshViewerWidget::next_frame()
 {
 	static int id = 0;
 	common::Mesh neutralMesh = dataReader_->getNeutralMesh();
+
 	if (!neutralMesh.has_vertex_normals())
 	{
 		neutralMesh.request_vertex_normals();
@@ -304,8 +316,12 @@ void MeshViewerWidget::calculateFace(
 	target.pc = cloud;
 	target.mesh = mesh;
 
-	const bool procrustesResult = matching::sparse::alignSparse(
-		neutralMesh, mesh, procrustesCorrespondences);
+	//	const bool procrustesResult =
+	//		matching::sparse::alignSparse(neutralMesh, mesh, procrustesCorrespondences);
+
+	common::Matrix4f poseInit =
+		matching::sparse::estimatePose(neutralMesh, mesh, correspondences);
+	bool procrustesResult = true;
 
 	this->clearMeshes();
 	if (procrustesResult)
@@ -313,27 +329,26 @@ void MeshViewerWidget::calculateFace(
 #ifdef VISUALIZE_PROCRUSTES_MESH
 		w.setMesh(neutralMesh);
 #endif
-		// disable corresponseces for a while. Maybe situation will change after
-		// optimization
-		nricp_->findDeformation(neutralMesh, target, {});
-		// for (common::Mesh::VertexIter vit = neutralMesh.vertices_begin();
-		// 	 vit != neutralMesh.vertices_end(); ++vit)
-		// {
-		// 	const auto& point = neutralMesh.point(*vit);
-		// 	const float queryPt[3] = {point[0], point[1], point[2]};
-		// 	size_t retIndex;
-		// 	float outDistSqr;
-		// 	nanoflann::KNNResultSet<float> resultSet(1);
-		// 	resultSet.init(&retIndex, &outDistSqr);
-		// 	const bool result = target.kdTree->findNeighbors(
-		// 		resultSet, &queryPt[0], nanoflann::SearchParams(10));
+		faceModel_->optimize(neutralMesh, target, correspondences, poseInit);
+		//nricp_->findDeformation(neutralMesh, target, correspondences);
+		for (common::Mesh::VertexIter vit = neutralMesh.vertices_begin();
+			 vit != neutralMesh.vertices_end(); ++vit)
+		{
+			const auto& point = neutralMesh.point(*vit);
+			const float queryPt[3] = {point[0], point[1], point[2]};
+			size_t retIndex;
+			float outDistSqr;
+			nanoflann::KNNResultSet<float> resultSet(1);
+			resultSet.init(&retIndex, &outDistSqr);
+			const bool result = target.kdTree->findNeighbors(
+				resultSet, &queryPt[0], nanoflann::SearchParams(10));
 
-		// 	if (result)
-		// 	{
-		// 		neutralMesh.set_color(*vit,
-		// 							  getRGB(0, 10e-9, std::sqrt(outDistSqr)));
-		// 	}
-		// }
+			if (result)
+			{
+				neutralMesh.set_color(*vit,
+									  getRGB(0, 10e-9, std::sqrt(outDistSqr)));
+			}
+		}
 
 		this->setMesh(mesh);
 		this->setMesh(neutralMesh);

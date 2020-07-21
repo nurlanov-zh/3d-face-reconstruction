@@ -36,6 +36,7 @@ target_link_libraries (face_viewer
   common
   sparse
   non_rigid_icp
+  face_model
   landmark_detection
   data_reader
   OpenMeshCore
