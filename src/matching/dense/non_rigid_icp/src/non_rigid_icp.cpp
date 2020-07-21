@@ -241,7 +241,7 @@ void NRICP::initBMatrix(const common::Mesh& source,
 		resultSet.init(&retIndex, &outDistSqr);
 		const bool found = target.kdTree->findNeighbors(
 			resultSet, &queryPt[0], nanoflann::SearchParams(10));
-		
+
 		const auto idx = vit->idx();
 		common::PointCloud::Point resPoint = {};
 		if (!found)
@@ -252,7 +252,6 @@ void NRICP::initBMatrix(const common::Mesh& source,
 		{
 			resPoint = target.pc->pts[retIndex];
 		}
-		
 
 		// set weights of border vertices to zero
 		// set weights if angle between normals above threshold to zero

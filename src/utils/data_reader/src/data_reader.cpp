@@ -18,6 +18,7 @@ const std::string SPARSE_CORR_NAME = "/sparse.corr";
 const std::string PROCRUSTES_NAME = "/procrustes.off";
 const std::string ASSIGNED_LANDMARKS_NAME = "/assigned_landmarks.txt";
 const std::string RGBD_DIR = "/RGBD";
+const std::string REALSENSE_DIR = "/RealSense";
 
 constexpr size_t NUM_OF_EIG_SHAPE = 160;
 constexpr size_t NUM_OF_EIG_EXP = 76;
@@ -51,7 +52,24 @@ DataReader::DataReader(const std::string& path, OpenMesh::IO::Options opt,
 	readKinectData();
 	readCorrespondences();
 	readAssignedLandmarks();
-	readRGBD();
+
+	try
+	{
+		readRGBD();
+	}
+	catch (const std::exception& e)
+	{
+		std::cerr << e.what() << '\n';
+	}
+
+	try
+	{
+		readRealSense();
+	}
+	catch (const std::exception& e)
+	{
+		std::cerr << e.what() << '\n';
+	}
 }
 
 void DataReader::readPCAFace()
@@ -230,7 +248,7 @@ bool DataReader::openMesh(const std::string& filename, common::Mesh& mesh)
 		mesh.request_vertex_normals();
 		mesh.request_vertex_colors();
 		mesh.request_vertex_texcoords2D();
-		
+
 		// update face and vertex normals
 		if (!opt_.check(OpenMesh::IO::Options::FaceNormal))
 		{
@@ -392,9 +410,69 @@ void DataReader::readRGBD()
 	}
 }
 
+void DataReader::readRealSense()
+{
+	const std::string path = path_ + "/" + REALSENSE_DIR;
+
+	const std::string cloudName = ".pcd";
+	const std::string imageName = ".png";
+
+	for (const auto& entry :
+		 std::experimental::filesystem::directory_iterator(path))
+	{
+		std::string str = entry.path().string();
+		{
+			const auto pos = str.find(cloudName);
+			if (pos != std::string::npos)
+			{
+				cloudNamesRealSense_.push_back(str);
+				continue;
+			}
+		}
+
+		{
+			const auto pos = str.find(imageName);
+			if (pos != std::string::npos)
+			{
+				imageNamesRealSense_.push_back(str);
+				continue;
+			}
+		}
+	}
+
+	sort(imageNamesRealSense_.begin(), imageNamesRealSense_.end(),
+		 [](const std::string& a, const std::string& b) -> bool {
+		 	const size_t posA = a.find_last_of("/");
+		 	const size_t posB = b.find_last_of("/");
+		 	const size_t posAUnderscore = a.find("_");
+		 	const size_t posBUnderscore = b.find("_");
+		 	std::cout << a.substr(posA + 1, a.find("_")) << std::endl;
+			 return std::stoi(a.substr(posA + 1, posAUnderscore)) <= std::stoi(b.substr(posB + 1, posBUnderscore));
+		 });
+
+	sort(cloudNamesRealSense_.begin(), cloudNamesRealSense_.end(),
+		 [](const std::string& a, const std::string& b) -> bool {
+ 		 	const size_t posA = a.find_last_of("/");
+		 	const size_t posB = b.find_last_of("/");
+		 	const size_t posAUnderscore = a.find("_");
+		 	const size_t posBUnderscore = b.find("_");
+			 return std::stoi(a.substr(posA + 1, posAUnderscore)) <= std::stoi(b.substr(posB + 1, posBUnderscore));
+		 });
+
+	if (imageNamesRealSense_.size() != cloudNamesRealSense_.size())
+	{
+		errLog_->error("Different amount of images and clouds");
+	}
+}
+
 bool DataReader::isNextRGBDExists() const
 {
 	return imageNames_.size() != 0 && cloudNames_.size() != 0;
+}
+
+bool DataReader::isNextRealSenseExists() const
+{
+	return imageNamesRealSense_.size() != 0 && cloudNamesRealSense_.size() != 0;
 }
 
 std::optional<std::pair<cv::Mat, pcl::PointCloud<pcl::PointXYZRGB>::Ptr>>
@@ -417,6 +495,38 @@ DataReader::nextRGBD()
 
 	imageNames_.erase(imageName);
 	cloudNames_.erase(cloudName);
+	const auto end = std::chrono::steady_clock::now();
+	consoleLog_->debug(
+		"Next image and cloud are loaded in " +
+		std::to_string(
+			std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+				.count()) +
+		" ms");
+
+	return std::make_optional(std::make_pair(image, cloud));
+}
+
+std::optional<std::pair<cv::Mat, pcl::PointCloud<pcl::PointXYZRGB>::Ptr>>
+DataReader::nextRealSense()
+{
+	const auto start = std::chrono::steady_clock::now();
+	std::vector<Eigen::Vector3f> landmarks;
+	const auto imageName = imageNamesRealSense_.begin();
+	const auto cloudName = cloudNamesRealSense_.begin();
+	std::cout << *imageName << " " << *cloudName << std::endl;
+
+	const cv::Mat image = cv::imread(*imageName, cv::IMREAD_COLOR);
+
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(
+		new pcl::PointCloud<pcl::PointXYZRGB>());
+	if (pcl::io::loadPCDFile<pcl::PointXYZRGB>(*cloudName, *cloud) == -1)
+	{
+		errLog_->error("Couldn't read the pcd file: " + (*cloudName));
+		return {};
+	}
+
+	imageNamesRealSense_.erase(imageName);
+	cloudNamesRealSense_.erase(cloudName);
 	const auto end = std::chrono::steady_clock::now();
 	consoleLog_->debug(
 		"Next image and cloud are loaded in " +

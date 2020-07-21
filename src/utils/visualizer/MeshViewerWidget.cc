@@ -44,6 +44,7 @@
 //== INCLUDES =================================================================
 
 #include "MeshViewerWidget.hh"
+#include <unordered_set>
 
 //== IMPLEMENTATION ==========================================================
 
@@ -55,6 +56,11 @@ const std::string DETECTION_MODEL_PATH =
 constexpr int32_t WIDTH = 1280;
 constexpr int32_t BAR = 100;
 constexpr int32_t HEIGHT = 720;
+const std::unordered_set<int32_t> landmarksIdsProcrustes = {
+	0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16,
+	17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
+	34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+	51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67};
 
 MeshViewerWidget::MeshViewerWidget(bool sequence,
 								   const OpenMesh::IO::Options& opt,
@@ -80,8 +86,14 @@ MeshViewerWidget::MeshViewerWidget(bool sequence,
 	params.betaInit = 1;
 	params.alphaInit = 1000;
 	params.alphaMin = 100;
-	params.numOfOuterIterations = 100;
+	params.numOfOuterIterations = 10;
 	nricp_.reset(new matching::refinement::NRICP(params));
+
+	Eigen::Vector3d trans = {-0.00356676848605, 0.0257014129311,
+							 0.00136031582952};
+	const Eigen::Quaterniond q = Eigen::Quaterniond(
+		0.999997079372, 0.00196678028442, -0.0010471905116, -0.000916811462957);
+	imageToDepth_ = Sophus::SE3d(q.normalized().toRotationMatrix(), trans);
 
 	next_frame();
 }
@@ -113,6 +125,7 @@ void MeshViewerWidget::saveImage(const std::string& filename)
 
 void MeshViewerWidget::next_frame()
 {
+	static int id = 0;
 	common::Mesh neutralMesh = dataReader_->getNeutralMesh();
 	if (!neutralMesh.has_vertex_normals())
 	{
@@ -123,9 +136,9 @@ void MeshViewerWidget::next_frame()
 	{
 		landmark_detection::LandmarkDetection lmd(DETECTION_MODEL_PATH);
 		const auto& assignedLandmarks = dataReader_->getAssignedLandmarks();
-		if (dataReader_->isNextRGBDExists())
+		if (dataReader_->isNextRealSenseExists())
 		{
-			const auto nextRgbd = dataReader_->nextRGBD();
+			const auto nextRgbd = dataReader_->nextRealSense();
 			if (!nextRgbd.has_value())
 			{
 				spdlog::get("stderr")->error("No rgbd sequence! Exit");
@@ -135,6 +148,7 @@ void MeshViewerWidget::next_frame()
 			const auto& landmarks = lmd.detect(nextRgbd.value().first);
 
 			std::vector<common::Vec2i> correspondences;
+			std::vector<common::Vec2i> procrustesCorrespondences;
 
 			common::Mesh mesh;
 			mesh.request_face_normals();
@@ -143,24 +157,28 @@ void MeshViewerWidget::next_frame()
 			mesh.request_vertex_colors();
 			mesh.request_vertex_texcoords2D();
 
+			cv::Mat image = nextRgbd.value().first;
 			// dirty but who cares
-			std::vector<pcl::PointXYZRGB> points;
+			std::vector<std::pair<int32_t, pcl::PointXYZRGB>> points;
 			for (size_t i = 0; i < landmarks.size(); ++i)
 			{
-				const auto lm3d = nextRgbd.value().second->at(
-					landmarks[i](0) / 2, landmarks[i](1) / 2);
+				image.at<cv::Vec3b>(landmarks[i](1), landmarks[i](0)) = {255, 0,
+																		 0};
+				const auto lm3d = nextRgbd.value().second->at(landmarks[i](0),
+															  landmarks[i](1));
 				if (!std::isnan(lm3d.x) && !std::isnan(lm3d.y) &&
 					!std::isnan(lm3d.z))
 				{
-					points.push_back(lm3d);
+					points.push_back(std::make_pair(i, lm3d));
 				}
 			}
+			cv::imwrite("/tmp/image_lm_" + std::to_string(id) + ".png", image);
 
 			pcl::PointXYZRGB mean;
-			;
+
 			for (size_t i = 0; i < points.size(); ++i)
 			{
-				const auto point = points[i];
+				const auto point = points[i].second;
 				mean.x += point.x;
 				mean.y += point.y;
 				mean.z += point.z;
@@ -171,14 +189,25 @@ void MeshViewerWidget::next_frame()
 
 			for (size_t i = 0; i < points.size(); ++i)
 			{
-				if ((mean.x - points[i].x) * (mean.x - points[i].x) +
-						(mean.y - points[i].y) * (mean.y - points[i].y) +
-						(mean.z - points[i].z) * (mean.z - points[i].z) <
+				if ((mean.x - points[i].second.x) *
+							(mean.x - points[i].second.x) +
+						(mean.y - points[i].second.y) *
+							(mean.y - points[i].second.y) +
+						(mean.z - points[i].second.z) *
+							(mean.z - points[i].second.z) <
 					0.1)
 				{
 					const common::Mesh::VertexHandle& handle =
 						mesh.add_vertex(common::Mesh::Point(
-							points[i].x, -points[i].y, -points[i].z));
+							points[i].second.x, -points[i].second.y,
+							-points[i].second.z));
+
+					if (landmarksIdsProcrustes.find(points[i].first) !=
+						landmarksIdsProcrustes.end())
+					{
+						procrustesCorrespondences.push_back(
+							{assignedLandmarks[i], handle.idx()});
+					}
 					correspondences.push_back(
 						{assignedLandmarks[i], handle.idx()});
 					mesh.set_color(handle, {255, 0, 0});
@@ -192,23 +221,23 @@ void MeshViewerWidget::next_frame()
 					 nextRgbd.value().second->begin();
 				 it != nextRgbd.value().second->end(); ++it)
 			{
-				if (it->x < 0.5 && it->x > -0.5 && it->y > -2.0 &&
-					it->y < 2.0 && it->z > 0 && it->z < 2.5)
+				// if (it->x < 0.5 && it->x > -0.5 && it->y > -2.0 &&
+				// 	it->y < 2.0 && it->z > 0 && it->z < 2.5)
 				{
 					uint32_t rgb = *reinterpret_cast<uint32_t*>(&(it->rgb));
 					uint8_t r = (rgb >> 16) & 0x0000ff;
 					uint8_t g = (rgb >> 8) & 0x0000ff;
 					uint8_t b = (rgb)&0x0000ff;
-
 					const auto& handle = mesh.add_vertex(
 						common::Mesh::Point(it->x, -it->y, -it->z));
-					mesh.set_color(handle, {r, g, b});
+					mesh.set_color(handle, {b, g, r});
 				}
 			}
 			mesh.update_vertex_normals();
 			mesh.update_face_normals();
 
-			calculateFace(neutralMesh, mesh, correspondences);
+			calculateFace(neutralMesh, mesh, procrustesCorrespondences,
+						  correspondences);
 		}
 	}
 	else
@@ -220,17 +249,17 @@ void MeshViewerWidget::next_frame()
 			kinectMesh.request_vertex_normals();
 		}
 
-		calculateFace(neutralMesh, kinectMesh, correspondences);
+		calculateFace(neutralMesh, kinectMesh, correspondences,
+					  correspondences);
 
 		kinectMesh.release_vertex_normals();
 	}
-	static int id = 0;
 	saveImage(std::to_string(id++) + ".png");
 }
 
 void MeshViewerWidget::play()
 {
-	while (dataReader_->isNextRGBDExists())
+	while (dataReader_->isNextRealSenseExists())
 	{
 		next_frame();
 	}
@@ -248,6 +277,7 @@ common::Mesh::Color getRGB(float minimum, float maximum, float value)
 
 void MeshViewerWidget::calculateFace(
 	common::Mesh& neutralMesh, const common::Mesh& mesh,
+	const std::vector<common::Vec2i>& procrustesCorrespondences,
 	const std::vector<common::Vec2i>& correspondences)
 {
 	std::shared_ptr<common::PointCloud> cloud =
@@ -274,8 +304,8 @@ void MeshViewerWidget::calculateFace(
 	target.pc = cloud;
 	target.mesh = mesh;
 
-	const bool procrustesResult =
-		matching::sparse::alignSparse(neutralMesh, mesh, correspondences);
+	const bool procrustesResult = matching::sparse::alignSparse(
+		neutralMesh, mesh, procrustesCorrespondences);
 
 	this->clearMeshes();
 	if (procrustesResult)
@@ -286,26 +316,26 @@ void MeshViewerWidget::calculateFace(
 		// disable corresponseces for a while. Maybe situation will change after
 		// optimization
 		nricp_->findDeformation(neutralMesh, target, {});
-		for (common::Mesh::VertexIter vit = neutralMesh.vertices_begin();
-			 vit != neutralMesh.vertices_end(); ++vit)
-		{
-			const auto& point = neutralMesh.point(*vit);
-			const float queryPt[3] = {point[0], point[1], point[2]};
-			size_t retIndex;
-			float outDistSqr;
-			nanoflann::KNNResultSet<float> resultSet(1);
-			resultSet.init(&retIndex, &outDistSqr);
-			const bool result = target.kdTree->findNeighbors(
-				resultSet, &queryPt[0], nanoflann::SearchParams(10));
+		// for (common::Mesh::VertexIter vit = neutralMesh.vertices_begin();
+		// 	 vit != neutralMesh.vertices_end(); ++vit)
+		// {
+		// 	const auto& point = neutralMesh.point(*vit);
+		// 	const float queryPt[3] = {point[0], point[1], point[2]};
+		// 	size_t retIndex;
+		// 	float outDistSqr;
+		// 	nanoflann::KNNResultSet<float> resultSet(1);
+		// 	resultSet.init(&retIndex, &outDistSqr);
+		// 	const bool result = target.kdTree->findNeighbors(
+		// 		resultSet, &queryPt[0], nanoflann::SearchParams(10));
 
-			if (result)
-			{
-				neutralMesh.set_color(*vit,
-									  getRGB(0, 10e-9, std::sqrt(outDistSqr)));
-			}
-		}
+		// 	if (result)
+		// 	{
+		// 		neutralMesh.set_color(*vit,
+		// 							  getRGB(0, 10e-9, std::sqrt(outDistSqr)));
+		// 	}
+		// }
 
-		//this->setMesh(mesh);
+		this->setMesh(mesh);
 		this->setMesh(neutralMesh);
 	}
 	else

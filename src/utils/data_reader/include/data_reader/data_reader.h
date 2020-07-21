@@ -84,8 +84,11 @@ class DataReader
 	}
 
 	bool isNextRGBDExists() const;
+	bool isNextRealSenseExists() const;
 	std::optional<std::pair<cv::Mat, pcl::PointCloud<pcl::PointXYZRGB>::Ptr>>
 	nextRGBD();
+	std::optional<std::pair<cv::Mat, pcl::PointCloud<pcl::PointXYZRGB>::Ptr>>
+	nextRealSense();
 
    private:
 	void readPCAFace();
@@ -95,6 +98,7 @@ class DataReader
 	void readCorrespondences();
 	void readProcrustes();
 	void readRGBD();
+	void readRealSense();
 	void readAssignedLandmarks();
 
 	float* loadEigenvectors(const std::string& filename,
@@ -131,6 +135,8 @@ class DataReader
 	std::vector<Eigen::Vector3f> pcdScan_;
 	std::map<size_t, std::string> imageNames_;
 	std::map<size_t, std::string> cloudNames_;
+	std::vector<std::string> imageNamesRealSense_;
+	std::vector<std::string> cloudNamesRealSense_;
 	std::vector<size_t> landmarkIds_;
 };
 }  // namespace utils

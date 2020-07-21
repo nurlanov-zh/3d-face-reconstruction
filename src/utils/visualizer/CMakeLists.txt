@@ -30,6 +30,8 @@ set (headers
 
 acg_add_executable (face_viewer ${sources} ${headers})
 
+include_directories(thirdparty/Sophus)
+
 target_link_libraries (face_viewer
   common
   sparse

@@ -50,6 +50,8 @@
 #include <non_rigid_icp/non_rigid_icp.h>
 #include <sparse/sparse_aligner.h>
 
+#include <sophus/se3.hpp>
+
 #include <OpenMesh/Tools/Utils/getopt.h>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 #include <OpenMesh/Tools/Utils/Timer.hh>
@@ -87,8 +89,12 @@ class MeshViewerWidget : public MeshViewerWidgetT<common::Mesh>
 	void next_frame();
 
    private:
-	void calculateFace(common::Mesh& neutralMesh, const common::Mesh& mesh,
-					   const std::vector<common::Vec2i>& correspondences);
+	void calculateFace(
+		common::Mesh& neutralMesh, const common::Mesh& mesh,
+		const std::vector<common::Vec2i>& procrustesCorrespondences,
+		const std::vector<common::Vec2i>& correspondences);
+
+	common::Vec2i transformImageToDepth(const common::Vec2i& uv);
 
 	void saveImage(const std::string& filename);
 
@@ -98,4 +104,5 @@ class MeshViewerWidget : public MeshViewerWidgetT<common::Mesh>
 	std::unique_ptr<matching::refinement::NRICP> nricp_;
 	OpenMesh::IO::Options _options;
 	cv::VideoWriter outputVideo_;
+	Sophus::SE3d imageToDepth_;
 };
