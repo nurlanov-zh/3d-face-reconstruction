@@ -277,6 +277,8 @@ void MeshViewerWidget::calculateFace(
 	const bool procrustesResult =
 		matching::sparse::alignSparse(neutralMesh, mesh, correspondences);
 
+	//tracking::icp::trackICP(neutralMesh, temp, correspondences);
+
 	this->clearMeshes();
 	if (procrustesResult)
 	{

@@ -49,6 +49,7 @@
 #include <landmark_detection/face_landmark_detection.h>
 #include <non_rigid_icp/non_rigid_icp.h>
 #include <sparse/sparse_aligner.h>
+#include <icp/icp.h>
 
 #include <OpenMesh/Tools/Utils/getopt.h>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>

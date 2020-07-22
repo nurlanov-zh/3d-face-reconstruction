@@ -1,7 +1,7 @@
 include (ACGCommon)
 
 if (MSVC)
-	add_compile_definitions(_USE_MATH_DEFINES)
+	add_compile_definitions(_USE_MATH_DEFINES _HAS_AUTO_PTR_ETC)
 endif ()
 
 include_directories (
@@ -40,6 +40,7 @@ target_link_libraries (face_viewer
   OpenMeshTools
   Qt5::OpenGL
   spdlog::spdlog
+  icp
   ${OPENGL_LIBRARIES}
   ${PCL_LIBRARIES}
 )
