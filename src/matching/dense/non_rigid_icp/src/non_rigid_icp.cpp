@@ -50,7 +50,7 @@ NRICP::NRICP(const NRICPParams& params) : params_(params)
 		4 * params_.numOfEdges + params_.numOfVertices + params_.numOfLandmarks,
 		3);
 
-	XTPrev_ = Eigen::Matrix3Xf(4 * params_.numOfVertices, 3);
+	XTPrev_ = Eigen::Matrix3Xf(3, 4 * params_.numOfVertices);
 	XTPrev_.setZero();
 	norm_ = 10e10;
 

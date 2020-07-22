@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/IO/Options.hh>
 

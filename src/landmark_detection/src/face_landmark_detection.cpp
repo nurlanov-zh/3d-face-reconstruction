@@ -6,7 +6,8 @@ namespace landmark_detection
 LandmarkDetection::LandmarkDetection(const std::string& shapePredictorPath)
 {
 	std::ifstream file(shapePredictorPath);
-	dlib::deserialize(predictor_, file);
+	//dlib::deserialize(predictor_, file);
+	dlib::deserialize(shapePredictorPath) >> predictor_;
 	detector_ = dlib::get_frontal_face_detector();
 
 	consoleLog_ = spdlog::get("console");
