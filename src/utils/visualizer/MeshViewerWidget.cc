@@ -83,8 +83,8 @@ MeshViewerWidget::MeshViewerWidget(bool sequence,
 	params.numOfLandmarks = 68;
 	params.betaInit = 1;
 	params.alphaInit = 10000;
-	params.alphaMin = 5000;
-	params.numOfOuterIterations = 10;
+	params.alphaMin = 10;
+	params.numOfOuterIterations = 100;
 	nricp_.reset(new matching::refinement::NRICP(params));
 
 	matching::optimize::FaceModelParams faceModelParams;
@@ -261,7 +261,7 @@ void MeshViewerWidget::next_frame()
 						uint8_t g = (rgb >> 8) & 0x0000ff;
 						uint8_t b = (rgb)&0x0000ff;
 
-						if (x % 4 == 0 && y % 4 == 0)
+						if (x % 3 == 0 && y % 3 == 0)
 						{
 							const auto& handle =
 								mesh.add_vertex(common::Mesh::Point(
@@ -327,7 +327,6 @@ void MeshViewerWidget::next_frame()
 						isSameFacet(currentPoint, neighbor2Point) &&
 						isSameFacet(neighbor1Point, neighbor2Point))
 					{
-						std::cout << "added" << std::endl;
 						std::vector<common::Mesh::VertexHandle> faceVhandles;
 						faceVhandles.clear();
 						faceVhandles.push_back(
@@ -425,8 +424,8 @@ void MeshViewerWidget::calculateFace(
 
 	/*const bool procrustesResult =
 		matching::sparse::alignSparse(neutralMesh, mesh,
-	   procrustesCorrespondences);
-*/
+	   procrustesCorrespondences);*/
+
 	common::Matrix4f poseInit = matching::sparse::estimatePose(
 		neutralMesh, mesh, procrustesCorrespondences);
 
@@ -435,13 +434,12 @@ void MeshViewerWidget::calculateFace(
 #ifdef VISUALIZE_PROCRUSTES_MESH
 		w.setMesh(neutralMesh);
 #endif
-		/*faceModel_->optimize(neutralMesh, target, procrustesCorrespondences,
-							 poseInit);*/
+		faceModel_->optimize(neutralMesh, target, procrustesCorrespondences,
+							 poseInit);
 
-		// matching::sparse::transformAndWrite(neutralMesh, poseInit);
+		//matching::sparse::transformAndWrite(neutralMesh, poseInit);
 
-		// nricp_->findDeformation(neutralMesh, target,
-		// procrustesCorrespondences);
+		nricp_->findDeformation(neutralMesh, target, {});
 		for (common::Mesh::VertexIter vit = neutralMesh.vertices_begin();
 			 vit != neutralMesh.vertices_end(); ++vit)
 		{
@@ -457,14 +455,14 @@ void MeshViewerWidget::calculateFace(
 			if (result)
 			{
 				neutralMesh.set_color(
-					*vit, common::Mesh::Color(target.pc->pts[retIndex].r,
+					*vit, /*common::Mesh::Color(target.pc->pts[retIndex].r,
 											  target.pc->pts[retIndex].g,
-											  target.pc->pts[retIndex].b));
-				// getRGB(0, 10e-9, std::sqrt(outDistSqr)));
+											  target.pc->pts[retIndex].b));*/
+					getRGB(0, 5e-4, std::sqrt(outDistSqr)));
 			}
 		}
 
-		// this->setMesh(meshVis);
+		this->setMesh(mesh);
 		this->setMesh(neutralMesh);
 	}
 }
