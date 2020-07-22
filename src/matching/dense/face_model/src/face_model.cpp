@@ -16,6 +16,8 @@ FaceModel::FaceModel(const FaceModelParams& params) : params_(params)
 	shapeBasisDev_.resize(NUM_OF_EIG_SHAPE);
 	expressionsBasis_.resize(3 * NUM_OF_VERTICES, NUM_OF_EIG_EXP);
 	expressionsBasisDev_.resize(NUM_OF_EIG_EXP);
+
+	neutralShape_.resize(3 * NUM_OF_VERTICES);
 }
 
 void FaceModel::setShapeBasis(std::vector<common::float4>& shapeBasis)
@@ -69,9 +71,8 @@ void FaceModel::optimize(common::Mesh& neutralMesh,
 						 const std::vector<common::Vec2i>& correspondences,
 						 const common::Matrix4f& poseInit)
 {
-	//	transform_ = Sophus::SE3d(poseInit.cast<double>());
+	transform_ = Sophus::SE3d();
 
-	neutralShape_.resize(3 * NUM_OF_VERTICES);
 	size_t i = 0;
 	for (common::Mesh::VertexIter vit = neutralMesh.vertices_begin();
 		 vit != neutralMesh.vertices_end(); i++, vit++)
@@ -97,27 +98,26 @@ void FaceModel::optimize(common::Mesh& neutralMesh,
 										NUM_OF_EIG_SHAPE, NUM_OF_EIG_EXP,
 										Sophus::SE3d::num_parameters>(
 			new geomFunctor(shapeBasis_, shapeBasisDev_, expressionsBasis_,
-							expressionsBasisDev_, neutralShape_, neutralMesh, target,
-							correspondences, poseInit.cast<double>()),
+							expressionsBasisDev_, neutralShape_, neutralMesh,
+							target, correspondences, poseInit.cast<double>()),
 			2 * target.mesh.n_vertices() + correspondences.size() +
-				matching::optimize::NUM_OF_EIG_SHAPE + matching::optimize::NUM_OF_EIG_EXP);
+				NUM_OF_EIG_SHAPE + NUM_OF_EIG_EXP);
 
 	std::cout << "There are " << target.mesh.n_vertices() << " target points"
 			  << std::endl;
 
-	std::cout << "There are " << matching::optimize::NUM_OF_VERTICES
-			  << " vertices on mesh" << std::endl;
+	std::cout << "There are " << NUM_OF_VERTICES << " vertices on mesh"
+			  << std::endl;
 
-	problem.AddResidualBlock(cost_function,
-							 nullptr,
-							 shapeBasisCoefs_.data(),
+	problem.AddResidualBlock(cost_function, nullptr, shapeBasisCoefs_.data(),
 							 expressionsBasisCoefs_.data(), transform_.data());
 
 	// Solve
 	ceres::Solver::Options ceres_options;
 	ceres_options.max_num_iterations = params_.max_num_iterations;
 	ceres_options.linear_solver_type = ceres::DENSE_QR;
-	ceres_options.num_threads = 1;
+	ceres_options.trust_region_strategy_type = ceres::LEVENBERG_MARQUARDT;
+	ceres_options.num_threads = 2;
 	ceres::Solver::Summary summary;
 
 	Solve(ceres_options, &problem, &summary);
@@ -132,16 +132,18 @@ void FaceModel::optimize(common::Mesh& neutralMesh,
 			break;
 	}
 
-//	int idx = 4;
-//	expressionsBasisCoefs_(idx) = expressionsBasisDev_(idx);
-//
-//
-//	std::cout << "Shape coefs Dev: " << shapeBasisDev_.transpose() << std::endl;
-//	std::cout << "Expr coefs Dev: " << expressionsBasisDev_.transpose() << std::endl;
+	//	int idx = 4;
+	//	expressionsBasisCoefs_(idx) = expressionsBasisDev_(idx);
+	//
+	//
+	//	std::cout << "Shape coefs Dev: " << shapeBasisDev_.transpose() <<
+	// std::endl; 	std::cout << "Expr coefs Dev: " <<
+	// expressionsBasisDev_.transpose() << std::endl;
 
 	std::cout << "Results: " << std::endl;
 	std::cout << "Shape coefs: " << shapeBasisCoefs_.transpose() << std::endl;
-	std::cout << "Expr coefs: " << expressionsBasisCoefs_.transpose() << std::endl;
+	std::cout << "Expr coefs: " << expressionsBasisCoefs_.transpose()
+			  << std::endl;
 
 	applyToMesh(neutralMesh, poseInit.cast<double>());
 }

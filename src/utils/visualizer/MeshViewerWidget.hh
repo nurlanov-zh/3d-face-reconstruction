@@ -92,6 +92,7 @@ class MeshViewerWidget : public MeshViewerWidgetT<common::Mesh>
    private:
 	void calculateFace(
 		common::Mesh& neutralMesh, const common::Mesh& mesh,
+		const common::Mesh& meshVis,
 		const std::vector<common::Vec2i>& procrustesCorrespondences,
 		const std::vector<common::Vec2i>& correspondences);
 
@@ -102,9 +103,7 @@ class MeshViewerWidget : public MeshViewerWidgetT<common::Mesh>
    private:
 	bool seq_;
 	std::unique_ptr<utils::DataReader> dataReader_;
-	//	std::unique_ptr<matching::refinement::NRICP> nricp_;
+	std::unique_ptr<matching::refinement::NRICP> nricp_;
 	std::unique_ptr<matching::optimize::FaceModel> faceModel_;
 	OpenMesh::IO::Options _options;
-	cv::VideoWriter outputVideo_;
-	Sophus::SE3d imageToDepth_;
 };

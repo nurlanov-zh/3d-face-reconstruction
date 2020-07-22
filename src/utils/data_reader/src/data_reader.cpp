@@ -6,7 +6,6 @@
 
 namespace utils
 {
-
 DataReader::DataReader(const std::string& path, OpenMesh::IO::Options opt,
 					   const int32_t sequenceId)
 	: path_(path), opt_(opt), sequenceId_(sequenceId)
@@ -63,13 +62,15 @@ void DataReader::readPCAFace()
 			throw std::runtime_error("Average face");
 		}
 		// scale
+		int i = 0;
 		for (auto vIt = neutralMesh_.vertices_begin();
 			 vIt != neutralMesh_.vertices_end(); ++vIt)
 		{
+			i++;
 			OpenMesh::Vec3f newCoordinate = neutralMesh_.point(*vIt);
 			neutralMesh_.set_point(*vIt, newCoordinate * SCALE_NEUTRAL);
 		}
-
+		std::cout << i << std::endl;
 		const auto end = std::chrono::steady_clock::now();
 		consoleLog_->info(
 			"Average face is successfully loaded in " +
@@ -422,21 +423,22 @@ void DataReader::readRealSense()
 
 	sort(imageNamesRealSense_.begin(), imageNamesRealSense_.end(),
 		 [](const std::string& a, const std::string& b) -> bool {
-		 	const size_t posA = a.find_last_of("/");
-		 	const size_t posB = b.find_last_of("/");
-		 	const size_t posAUnderscore = a.find("_");
-		 	const size_t posBUnderscore = b.find("_");
-		 	std::cout << a.substr(posA + 1, a.find("_")) << std::endl;
-			 return std::stoi(a.substr(posA + 1, posAUnderscore)) <= std::stoi(b.substr(posB + 1, posBUnderscore));
+			 const size_t posA = a.find_last_of("/");
+			 const size_t posB = b.find_last_of("/");
+			 const size_t posAUnderscore = a.find("_");
+			 const size_t posBUnderscore = b.find("_");
+			 return std::stoi(a.substr(posA + 1, posAUnderscore)) <=
+					std::stoi(b.substr(posB + 1, posBUnderscore));
 		 });
 
 	sort(cloudNamesRealSense_.begin(), cloudNamesRealSense_.end(),
 		 [](const std::string& a, const std::string& b) -> bool {
- 		 	const size_t posA = a.find_last_of("/");
-		 	const size_t posB = b.find_last_of("/");
-		 	const size_t posAUnderscore = a.find("_");
-		 	const size_t posBUnderscore = b.find("_");
-			 return std::stoi(a.substr(posA + 1, posAUnderscore)) <= std::stoi(b.substr(posB + 1, posBUnderscore));
+			 const size_t posA = a.find_last_of("/");
+			 const size_t posB = b.find_last_of("/");
+			 const size_t posAUnderscore = a.find("_");
+			 const size_t posBUnderscore = b.find("_");
+			 return std::stoi(a.substr(posA + 1, posAUnderscore)) <=
+					std::stoi(b.substr(posB + 1, posBUnderscore));
 		 });
 
 	if (imageNamesRealSense_.size() != cloudNamesRealSense_.size())
@@ -493,7 +495,7 @@ DataReader::nextRealSense()
 	std::vector<Eigen::Vector3f> landmarks;
 	const auto imageName = imageNamesRealSense_.begin();
 	const auto cloudName = cloudNamesRealSense_.begin();
-	std::cout << *imageName << " " << *cloudName << std::endl;
+	consoleLog_->info(*imageName + " " + *cloudName);
 
 	const cv::Mat image = cv::imread(*imageName, cv::IMREAD_COLOR);
 

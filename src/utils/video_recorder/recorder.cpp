@@ -189,6 +189,7 @@ void catch_image()
 		cv::Mat bgr_img;
 		cv::cvtColor(rgb_img, bgr_img, cv::COLOR_BGR2RGB);
 		cv::imwrite(std::to_string(id) + "_rgb.png", bgr_img);
+		cv::imwrite(std::to_string(id) + "_depth.png", depth_img);
 		rs2::pointcloud pc;
 		pc.map_to(color);
 		auto points = pc.calculate(depth);
@@ -211,11 +212,11 @@ int main(int argc, char* argv[]) try
 		while (true)
 		{
 			auto work_to_do = work_queue.wait_and_pop();
-			ptr_cloud cloud = points_to_pcl(std::get<0>(work_to_do), std::get<1>(work_to_do));
+			ptr_cloud cloud =
+				points_to_pcl(std::get<0>(work_to_do), std::get<1>(work_to_do));
 
 			pcl::io::savePCDFileBinary(
-				std::to_string(std::get<2>(work_to_do)) + "_depth.pcd",
-				*cloud);
+				std::to_string(std::get<2>(work_to_do)) + "_depth.pcd", *cloud);
 			work_queue.pop();
 			std::cout << "processed " << std::get<2>(work_to_do) << " frame"
 					  << std::endl;

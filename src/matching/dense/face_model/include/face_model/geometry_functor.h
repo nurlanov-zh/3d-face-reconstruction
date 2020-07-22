@@ -13,8 +13,7 @@ struct geomFunctor
 			&expressionsBasis,
 		const Eigen::Vector<double, Eigen::Dynamic> &expressionsBasisDev,
 		const Eigen::Vector<double, Eigen::Dynamic> &neutralShape,
-		const common::Mesh &sourceMesh,
-		const common::Target &target,
+		const common::Mesh &sourceMesh, const common::Target &target,
 		const std::vector<common::Vec2i> &correspondences,
 		const Eigen::Matrix4d &poseInit);
 
@@ -99,7 +98,8 @@ struct geomFunctor
 				{
 					std::cout << "There is error!" << std::endl;
 					std::cout << "Mesh point: " << targetPoint << std::endl;
-					std::cout << "Point cloud point: " << resPoint.x << ", " << resPoint.y << ", " <<resPoint.z << std::endl;
+					std::cout << "Point cloud point: " << resPoint.x << ", "
+							  << resPoint.y << ", " << resPoint.z << std::endl;
 				}
 
 				T dist = T(0);
@@ -117,17 +117,24 @@ struct geomFunctor
 				// Add point to plain
 				auto normalTarget =
 					target_.mesh.normal(OpenMesh::VertexHandle(retIndex));
-				auto normalSource = sourceMesh_.normal(OpenMesh::VertexHandle(i));
+				auto normalSource =
+					sourceMesh_.normal(OpenMesh::VertexHandle(i));
 
 				T distNormalTarget = T(0);
-				distNormalTarget += (T(resPoint.x) - vertex(0)) * T(normalTarget[0]);
-				distNormalTarget += (T(resPoint.y) - vertex(1)) * T(normalTarget[1]);
-				distNormalTarget += (T(resPoint.z) - vertex(2)) * T(normalTarget[2]);
+				distNormalTarget +=
+					(T(resPoint.x) - vertex(0)) * T(normalTarget[0]);
+				distNormalTarget +=
+					(T(resPoint.y) - vertex(1)) * T(normalTarget[1]);
+				distNormalTarget +=
+					(T(resPoint.z) - vertex(2)) * T(normalTarget[2]);
 
 				T distNormalSource = T(0);
-				distNormalSource += (T(resPoint.x) - vertex(0)) * T(normalSource[0]);
-				distNormalSource += (T(resPoint.y) - vertex(1)) * T(normalSource[1]);
-				distNormalSource += (T(resPoint.z) - vertex(2)) * T(normalSource[2]);
+				distNormalSource +=
+					(T(resPoint.x) - vertex(0)) * T(normalSource[0]);
+				distNormalSource +=
+					(T(resPoint.y) - vertex(1)) * T(normalSource[1]);
+				distNormalSource +=
+					(T(resPoint.z) - vertex(2)) * T(normalSource[2]);
 
 				T distNormal = distNormalSource * distNormalSource +
 							   distNormalTarget * distNormalTarget;
@@ -148,6 +155,11 @@ struct geomFunctor
 			{
 				sResiduals[i] = T(0);
 			}
+
+			if (!ceres::isfinite(sResiduals[i]) || ceres::isnan(sResiduals[i]))
+			{
+				sResiduals[i] = T(0);
+			}
 		}
 
 		// Add correspondences loss
@@ -165,7 +177,8 @@ struct geomFunctor
 					(T(targetPoint[1]) - vertex(1));
 			dist += (T(targetPoint[2]) - vertex(2)) *
 					(T(targetPoint[2]) - vertex(2));
-			sResiduals[2 * target_.mesh.n_vertices() + i] = ceres::sqrt(T(wLan) * dist);
+			sResiduals[2 * target_.mesh.n_vertices() + i] =
+				ceres::sqrt(T(wLan) * dist);
 		}
 
 		// Add regularizers
@@ -173,18 +186,22 @@ struct geomFunctor
 		for (size_t i = 0; i < matching::optimize::NUM_OF_EIG_SHAPE; ++i)
 		{
 			sResiduals[2 * target_.mesh.n_vertices() + correspondences_.size() +
-					   i] = T(std::sqrt(wReg)) * shapeBasisCoefs(i) / T(shapeBasisDev_(i));
+					   i] = T(std::sqrt(wReg)) *
+							ceres::abs(shapeBasisCoefs(i)) /
+							T(shapeBasisDev_(i));
 		}
 
 		for (size_t i = 0; i < matching::optimize::NUM_OF_EIG_EXP; ++i)
 		{
 			sResiduals[2 * target_.mesh.n_vertices() + correspondences_.size() +
-				matching::optimize::NUM_OF_EIG_SHAPE + i] = T(std::sqrt(wReg)) *
-				expressionsBasisCoefs(i) / T(expressionsBasisDev_(i));
+					   matching::optimize::NUM_OF_EIG_SHAPE + i] =
+				T(std::sqrt(wReg)) * ceres::abs(expressionsBasisCoefs(i)) /
+				T(expressionsBasisDev_(i));
 		}
 
 		return true;
 	}
+
 	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> shapeBasis_;
 	Eigen::Vector<double, Eigen::Dynamic> shapeBasisDev_;
 	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> expressionsBasis_;
@@ -196,7 +213,7 @@ struct geomFunctor
 	Eigen::Matrix3d poseInitRot_;
 	Eigen::Vector3d poseInitTrans_;
 	double threshold_ = 10;
-	double wPoint = 2;
+	double wPoint = 1;
 	double wPlane = 10;
 	double wReg = 0.025;
 	double wLan = 0.125;
@@ -209,8 +226,7 @@ geomFunctor::geomFunctor(
 		&expressionsBasis,
 	const Eigen::Vector<double, -1> &expressionsBasisDev,
 	const Eigen::Vector<double, Eigen::Dynamic> &neutralShape,
-	const common::Mesh &sourceMesh,
-	const common::Target &target,
+	const common::Mesh &sourceMesh, const common::Target &target,
 	const std::vector<common::Vec2i> &correspondences,
 	const Eigen::Matrix4d &poseInit)
 	: shapeBasis_(shapeBasis),

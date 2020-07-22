@@ -1,2 +1,3 @@
 add_subdirectory(face_model)
 add_subdirectory(non_rigid_icp)
+#add_subdirectory(deformation_transform)

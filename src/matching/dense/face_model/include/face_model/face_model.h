@@ -16,14 +16,14 @@ namespace optimize
 {
 constexpr size_t NUM_OF_EIG_SHAPE = 160;
 constexpr size_t NUM_OF_EIG_EXP = 76;
-constexpr size_t NUM_OF_VERTICES = 213960;
+constexpr size_t NUM_OF_VERTICES = 53490;
 constexpr size_t NUM_OF_SPARSE_CORR = 4;
 constexpr size_t NUM_OF_LANDMARKS = 68;
 
 struct FaceModelParams
 {
 	double huber_parameter = 0.5;
-	int max_num_iterations = 50;
+	int max_num_iterations = 30;
 	int verbosity_level = 1;
 };
 

@@ -33,7 +33,7 @@ const std::string REALSENSE_DIR = "/RealSense";
 
 constexpr size_t NUM_OF_EIG_SHAPE = 160;
 constexpr size_t NUM_OF_EIG_EXP = 76;
-constexpr size_t NUM_OF_VERTICES = 213960;
+constexpr size_t NUM_OF_VERTICES = 53490;
 constexpr size_t NUM_OF_SPARSE_CORR = 4;
 constexpr size_t NUM_OF_LANDMARKS = 68;
 constexpr double SCALE_NEUTRAL = 1 / 1000000.0f;

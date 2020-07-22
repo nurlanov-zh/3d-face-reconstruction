@@ -194,13 +194,13 @@ void NRICP::initLandmarksMatrix(
 			correspondences[i][0] * 4 + 3, beta);
 
 		B_(4 * params_.numOfEdges + params_.numOfVertices + i, 0) =
-			targetPoint[0];
+			beta * targetPoint[0];
 
 		B_(4 * params_.numOfEdges + params_.numOfVertices + i, 1) =
-			targetPoint[1];
+			beta * targetPoint[1];
 
 		B_(4 * params_.numOfEdges + params_.numOfVertices + i, 2) =
-			targetPoint[2];
+			beta * targetPoint[2];
 	}
 }
 
