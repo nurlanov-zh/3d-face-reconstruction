@@ -100,7 +100,7 @@ int main(int argc, char** argv)
 
 	create_menu(mainWin);
 
-	mainWin.resize(1280, 720);
+	mainWin.resize(2560, 1440);
 	mainWin.show();
 
 	return app.exec();

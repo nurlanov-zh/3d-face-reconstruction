@@ -23,7 +23,7 @@ constexpr size_t NUM_OF_LANDMARKS = 68;
 struct FaceModelParams
 {
 	double huber_parameter = 0.5;
-	int max_num_iterations = 30;
+	int max_num_iterations = 10;
 	int verbosity_level = 1;
 };
 
@@ -40,6 +40,7 @@ class FaceModel
 				  const std::vector<common::Vec2i>& correspondences,
 				  const common::Matrix4f& poseInit);
 	void applyToMesh(common::Mesh& mesh, const common::Matrix4d& poseInit);
+	void getWithoutExpressions(common::Mesh& mesh, const common::Matrix4d& poseInit);
 
    private:
 	std::shared_ptr<spdlog::logger> consoleLog_;

@@ -24,7 +24,8 @@ struct NRICPParams
 	float alphaInit = 50;
 	float alphaMin = 1;
 	float betaInit = 1;
-	float normalsThreshold = 0.97;
+	float normalsThreshold = 0.9;
+	float maxHeighborDist = 0.03;
 	float eps = 60;
 };
 

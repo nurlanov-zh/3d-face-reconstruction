@@ -30,6 +30,8 @@ const std::string PROCRUSTES_NAME = "/procrustes.off";
 const std::string ASSIGNED_LANDMARKS_NAME = "/assigned_landmarks.txt";
 const std::string RGBD_DIR = "/RGBD";
 const std::string REALSENSE_DIR = "/RealSense";
+const std::string ARNOLD_NAME = "/ArnoldSchwarzeneggerBust.off";
+const std::string ARNOLD_CORR_NAME = "/ArnoldCorr.txt"; 
 
 constexpr size_t NUM_OF_EIG_SHAPE = 160;
 constexpr size_t NUM_OF_EIG_EXP = 76;
@@ -46,6 +48,9 @@ class DataReader
 
 	const common::Mesh& getNeutralMesh() const { return neutralMesh_; }
 	common::Mesh& getNeutralMesh() { return neutralMesh_; }
+
+	const common::Mesh& getArnoldMesh() const { return arnoldMesh_; }
+	common::Mesh& getArnoldMesh() { return arnoldMesh_; }
 
 	const std::vector<common::float4>& getShapeBasis() const
 	{
@@ -93,6 +98,7 @@ class DataReader
 	common::Mesh& getKinectMesh() { return kinectMesh_; }
 
 	std::vector<common::Vec2i> getCorrespondences() { return correspondences_; }
+	std::vector<common::Vec2i> getArnoldCorrespondences() { return arnoldCorrespondences_; }
 	common::Mesh& getProcrustesMesh()
 	{
 		readProcrustes();
@@ -121,6 +127,7 @@ class DataReader
 	void readRGBD();
 	void readRealSense();
 	void readAssignedLandmarks();
+	void readArnoldFace();
 
 	float* loadEigenvectors(const std::string& filename,
 							unsigned int components,
@@ -141,6 +148,7 @@ class DataReader
 	common::Mesh neutralMesh_;
 	common::Mesh kinectMesh_;
 	common::Mesh procrustesMesh_;
+	common::Mesh arnoldMesh_;
 
 	std::vector<common::float4> shapeBasis_;
 	std::vector<float> shapeBasisDev_;
@@ -152,6 +160,7 @@ class DataReader
 	std::vector<float> albedoBasisDev_;
 
 	std::vector<common::Vec2i> correspondences_;
+	std::vector<common::Vec2i> arnoldCorrespondences_;
 
 	std::vector<Eigen::Vector3f> pcdScan_;
 	std::map<size_t, std::string> imageNames_;

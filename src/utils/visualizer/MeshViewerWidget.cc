@@ -44,6 +44,7 @@
 //== INCLUDES =================================================================
 
 #include "MeshViewerWidget.hh"
+#include <unistd.h>
 #include <unordered_set>
 #include "face_model/face_model.h"
 
@@ -54,12 +55,13 @@
 const std::string DETECTION_MODEL_PATH =
 	"../data/detector/shape_predictor_68_face_landmarks.dat";
 
-constexpr int32_t WIDTH = 1280;
+constexpr int32_t WIDTH = 2560;
 constexpr int32_t BAR = 100;
-constexpr int32_t HEIGHT = 720;
+constexpr int32_t HEIGHT = 1440;
 const std::unordered_set<int32_t> landmarksIdsProcrustes = {
-	8,  17, 19, 21, 22, 24, 26, 27, 30, 31, 33, 35, 36, 37, 38, 39, 40, 41,
-	42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59};
+	8,  17, 19, 21, 22, 24, 26, 27, 30, 31, 33, 35, 36, 37, 38,
+	39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
+	54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67};
 
 MeshViewerWidget::MeshViewerWidget(bool sequence,
 								   const OpenMesh::IO::Options& opt,
@@ -81,10 +83,10 @@ MeshViewerWidget::MeshViewerWidget(bool sequence,
 	params.numOfEdges = neutralMesh.n_edges();
 	params.numOfVertices = neutralMesh.n_vertices();
 	params.numOfLandmarks = 68;
-	params.betaInit = 1;
-	params.alphaInit = 10000;
-	params.alphaMin = 10;
-	params.numOfOuterIterations = 100;
+	params.betaInit = 0.2;
+	params.alphaInit = 1000;
+	params.alphaMin = 500;
+	params.numOfOuterIterations = 10;
 	nricp_.reset(new matching::refinement::NRICP(params));
 
 	matching::optimize::FaceModelParams faceModelParams;
@@ -95,30 +97,31 @@ MeshViewerWidget::MeshViewerWidget(bool sequence,
 	faceModel_->setExpressionsBasis(dataReader_->getExpressionsBasis());
 	faceModel_->setExpressionsBasisDev(dataReader_->getExpressionsBasisDev());
 
-	next_frame();
-}
+	matching::transfer::DeformationTransferParams transferParams;
+	deformationTransfer_.reset(
+		new matching::transfer::DeformationTransfer(transferParams));
 
-void MeshViewerWidget::saveImage(const std::string& filename)
-{
-	cv::Mat pixels(HEIGHT - BAR, WIDTH, CV_8UC3);
-	glReadPixels(0, 0, WIDTH, HEIGHT - BAR, GL_RGB, GL_UNSIGNED_BYTE,
-				 pixels.data);
-	cv::Mat image(HEIGHT - BAR, WIDTH, CV_8UC3);
-
-	for (int y = 0; y < HEIGHT - BAR; y++)
+	justusNeutralMesh_ = dataReader_->getNeutralMesh();
+	if (!justusNeutralMesh_.has_vertex_normals())
 	{
-		for (int x = 0; x < WIDTH; x++)
-		{
-			image.at<cv::Vec3b>(y, x)[2] =
-				pixels.at<cv::Vec3b>(HEIGHT - BAR - y - 1, x)[0];
-			image.at<cv::Vec3b>(y, x)[1] =
-				pixels.at<cv::Vec3b>(HEIGHT - BAR - y - 1, x)[1];
-			image.at<cv::Vec3b>(y, x)[0] =
-				pixels.at<cv::Vec3b>(HEIGHT - BAR - y - 1, x)[2];
-		}
+		justusNeutralMesh_.request_vertex_normals();
 	}
 
-	cv::imwrite(filename, image);
+	const auto& justusCorrespondences =
+		dataReader_->getCorrespondences();
+	common::Mesh& kinectMesh = dataReader_->getKinectMesh();
+	if (!kinectMesh.has_vertex_normals())
+	{
+		kinectMesh.request_vertex_normals();
+	}
+
+	calculateFace(justusNeutralMesh_, kinectMesh, kinectMesh,
+				  justusCorrespondences, justusCorrespondences);
+
+	arnoldCorr_ = dataReader_->getArnoldCorrespondences();
+	arnoldMesh_ = dataReader_->getArnoldMesh();
+
+	next_frame();
 }
 
 void MeshViewerWidget::next_frame()
@@ -150,14 +153,14 @@ void MeshViewerWidget::next_frame()
 			std::vector<common::Vec2i> correspondences;
 			std::vector<common::Vec2i> procrustesCorrespondences;
 
-			common::Mesh meshVis;
-			meshVis.request_face_normals();
-			meshVis.request_face_colors();
-			meshVis.request_vertex_normals();
-			meshVis.request_vertex_colors();
-			meshVis.request_vertex_texcoords2D();
-
 			common::Mesh mesh;
+			mesh.request_face_normals();
+			mesh.request_face_colors();
+			mesh.request_vertex_normals();
+			mesh.request_vertex_colors();
+			mesh.request_vertex_texcoords2D();
+
+			common::Mesh denseMesh;
 			mesh.request_face_normals();
 			mesh.request_face_colors();
 			mesh.request_vertex_normals();
@@ -172,16 +175,16 @@ void MeshViewerWidget::next_frame()
 					landmarksIdsProcrustes.end())
 				{
 					cv::line(image,
-							 {static_cast<int32_t>(landmarks[i](0)) + 5,
-							  static_cast<int32_t>(landmarks[i](1)) - 5},
-							 {static_cast<int32_t>(landmarks[i](0)) - 5,
-							  static_cast<int32_t>(landmarks[i](1)) + 5},
+							 {static_cast<int32_t>(landmarks[i](0)) + 2,
+							  static_cast<int32_t>(landmarks[i](1)) - 2},
+							 {static_cast<int32_t>(landmarks[i](0)) - 2,
+							  static_cast<int32_t>(landmarks[i](1)) + 2},
 							 {0, 0, 255}, 3);
 					cv::line(image,
-							 {static_cast<int32_t>(landmarks[i](0)) - 5,
-							  static_cast<int32_t>(landmarks[i](1)) - 5},
-							 {static_cast<int32_t>(landmarks[i](0)) + 5,
-							  static_cast<int32_t>(landmarks[i](1)) + 5},
+							 {static_cast<int32_t>(landmarks[i](0)) - 2,
+							  static_cast<int32_t>(landmarks[i](1)) - 2},
+							 {static_cast<int32_t>(landmarks[i](0)) + 2,
+							  static_cast<int32_t>(landmarks[i](1)) + 2},
 							 {0, 0, 255}, 3);
 				}
 
@@ -223,8 +226,8 @@ void MeshViewerWidget::next_frame()
 							points[i].second.x, -points[i].second.y,
 							-points[i].second.z));
 
-					const common::Mesh::VertexHandle& handleVis =
-						meshVis.add_vertex(common::Mesh::Point(
+					const common::Mesh::VertexHandle& denseHandle =
+						denseMesh.add_vertex(common::Mesh::Point(
 							points[i].second.x, -points[i].second.y,
 							-points[i].second.z));
 
@@ -234,10 +237,12 @@ void MeshViewerWidget::next_frame()
 						procrustesCorrespondences.push_back(
 							{assignedLandmarks[i], handle.idx()});
 						mesh.set_color(handle, {255, 0, 0});
-						meshVis.set_color(handleVis, {255, 0, 0});
-						neutralMesh.set_color(
+						denseMesh.set_color(denseHandle, {points[i].second.r,
+														  points[i].second.g,
+														  points[i].second.b});
+						/*neutralMesh.set_color(
 							common::Mesh::VertexHandle(assignedLandmarks[i]),
-							{255, 0, 0});
+							{255, 0, 0});*/
 					}
 					correspondences.push_back(
 						{assignedLandmarks[i], handle.idx()});
@@ -253,7 +258,7 @@ void MeshViewerWidget::next_frame()
 				{
 					const auto point = nextRgbd.value().second->at(x, y);
 					if (!std::isnan(point.x) && !std::isnan(point.y) &&
-						!std::isnan(point.z) && point.z < 0.6 && point.z > 0.01)
+						!std::isnan(point.z) && point.z < 1.0 && point.z > 0.01)
 					{
 						uint32_t rgb =
 							*reinterpret_cast<const uint32_t*>(&(point.rgb));
@@ -261,17 +266,17 @@ void MeshViewerWidget::next_frame()
 						uint8_t g = (rgb >> 8) & 0x0000ff;
 						uint8_t b = (rgb)&0x0000ff;
 
-						if (x % 3 == 0 && y % 3 == 0)
+						if (x % 2 == 0 && y % 2 == 0)
 						{
 							const auto& handle =
 								mesh.add_vertex(common::Mesh::Point(
 									point.x, -point.y, -point.z));
 							mesh.set_color(handle, {b, g, r});
 						}
-						const auto& handleVis = meshVis.add_vertex(
+						const auto& denseHandle = denseMesh.add_vertex(
 							common::Mesh::Point(point.x, -point.y, -point.z));
-						idxs.at<int32_t>(y, x) = handleVis.idx();
-						meshVis.set_color(handleVis, {b, g, r});
+						denseMesh.set_color(denseHandle, {b, g, r});
+						idxs.at<int32_t>(y, x) = denseHandle.idx();
 					}
 				}
 			}
@@ -291,7 +296,7 @@ void MeshViewerWidget::next_frame()
 			};
 
 			const auto generateFacet =
-				[&meshVis, &isSameFacet, &idxs, &nextRgbd](
+				[&denseMesh, &isSameFacet, &idxs, &nextRgbd](
 					const cv::Point2i& currentIndex,
 					const cv::Point2i& neighbor1,
 					const cv::Point2i& neighbor2) -> void {
@@ -335,7 +340,7 @@ void MeshViewerWidget::next_frame()
 							common::Mesh::VertexHandle(neigh1Idx));
 						faceVhandles.push_back(
 							common::Mesh::VertexHandle(neigh2Idx));
-						meshVis.add_face(faceVhandles);
+						denseMesh.add_face(faceVhandles);
 					}
 				}
 			};
@@ -349,11 +354,39 @@ void MeshViewerWidget::next_frame()
 				}
 			}
 
-			meshVis.update_vertex_normals();
-			meshVis.update_face_normals();
+			denseMesh.update_normals();
+			mesh.update_normals();
+			neutralMesh.update_normals();
 
-			calculateFace(neutralMesh, mesh, meshVis, procrustesCorrespondences,
-						  correspondences);
+			common::Mesh woExpr = dataReader_->getNeutralMesh();
+			common::Matrix4d poseInitSeq = matching::sparse::estimatePose(
+				woExpr, mesh, procrustesCorrespondences).cast<double>();
+
+			calculateFace(neutralMesh, mesh, denseMesh,
+						  procrustesCorrespondences, correspondences);
+
+			faceModel_->getWithoutExpressions(woExpr, poseInitSeq);
+
+			std::vector<common::Vec2i> selfCorrespondences;
+			for (const auto& c : procrustesCorrespondences)
+			{
+				selfCorrespondences.push_back({c[0], c[0]});
+			}
+
+			common::Mesh justusMesh = justusNeutralMesh_;
+			//matching::sparse::alignSparse(woExpr, neutralMesh, selfCorrespondences);
+			matching::sparse::alignSparse(justusMesh, neutralMesh, selfCorrespondences);
+
+			deformationTransfer_->deformationTransfer(
+				woExpr, neutralMesh, justusMesh);
+
+			/*matching::sparse::alignSparse(neutralMesh, arnoldMesh_, arnoldCorr_);
+			deformationTransfer_->applyTransform(neutralMesh, arnoldMesh_, arnoldCorr_);
+*/
+			/*this->setMesh(woExpr);
+			this->setMesh(neutralMesh);*/
+			//this->setMesh(neutralMesh);
+			this->setMesh(justusMesh);
 		}
 	}
 	else
@@ -368,9 +401,11 @@ void MeshViewerWidget::next_frame()
 		calculateFace(neutralMesh, kinectMesh, kinectMesh, correspondences,
 					  correspondences);
 
+		// this->setMesh(mesh);
+		this->setMesh(neutralMesh);
+
 		kinectMesh.release_vertex_normals();
 	}
-	saveImage(std::to_string(id++) + ".png");
 }
 
 void MeshViewerWidget::play()
@@ -390,11 +425,7 @@ common::Mesh::Color getRGB(float minimum, float maximum, float value)
 	return common::Mesh::Color(r, g, b);
 }
 
-void MeshViewerWidget::calculateFace(
-	common::Mesh& neutralMesh, const common::Mesh& mesh,
-	const common::Mesh& meshVis,
-	const std::vector<common::Vec2i>& procrustesCorrespondences,
-	const std::vector<common::Vec2i>& correspondences)
+common::Target createTarget(const common::Mesh& mesh)
 {
 	std::shared_ptr<common::PointCloud> cloud =
 		std::make_shared<common::PointCloud>();
@@ -422,9 +453,20 @@ void MeshViewerWidget::calculateFace(
 	target.pc = cloud;
 	target.mesh = mesh;
 
-	/*const bool procrustesResult =
-		matching::sparse::alignSparse(neutralMesh, mesh,
-	   procrustesCorrespondences);*/
+	return target;
+}
+
+void MeshViewerWidget::calculateFace(
+	common::Mesh& neutralMesh, const common::Mesh& mesh,
+	const common::Mesh& denseMesh,
+	const std::vector<common::Vec2i>& procrustesCorrespondences,
+	const std::vector<common::Vec2i>& correspondences)
+{
+	const auto target = createTarget(mesh);
+	const auto denseTarget = createTarget(denseMesh);
+	/*	const bool procrustesResult =
+			matching::sparse::alignSparse(neutralMesh, mesh,
+		   procrustesCorrespondences);*/
 
 	common::Matrix4f poseInit = matching::sparse::estimatePose(
 		neutralMesh, mesh, procrustesCorrespondences);
@@ -437,9 +479,10 @@ void MeshViewerWidget::calculateFace(
 		faceModel_->optimize(neutralMesh, target, procrustesCorrespondences,
 							 poseInit);
 
-		//matching::sparse::transformAndWrite(neutralMesh, poseInit);
+		// matching::sparse::transformAndWrite(neutralMesh, poseInit);
 
-		nricp_->findDeformation(neutralMesh, target, {});
+		/*nricp_->findDeformation(neutralMesh, denseTarget,
+								procrustesCorrespondences);*/
 		for (common::Mesh::VertexIter vit = neutralMesh.vertices_begin();
 			 vit != neutralMesh.vertices_end(); ++vit)
 		{
@@ -449,21 +492,18 @@ void MeshViewerWidget::calculateFace(
 			float outDistSqr;
 			nanoflann::KNNResultSet<float> resultSet(1);
 			resultSet.init(&retIndex, &outDistSqr);
-			const bool result = target.kdTree->findNeighbors(
+			const bool result = denseTarget.kdTree->findNeighbors(
 				resultSet, &queryPt[0], nanoflann::SearchParams(10));
 
 			if (result)
 			{
 				neutralMesh.set_color(
-					*vit, /*common::Mesh::Color(target.pc->pts[retIndex].r,
-											  target.pc->pts[retIndex].g,
-											  target.pc->pts[retIndex].b));*/
-					getRGB(0, 5e-4, std::sqrt(outDistSqr)));
+					*vit, common::Mesh::Color(denseTarget.pc->pts[retIndex].r,
+											  denseTarget.pc->pts[retIndex].g,
+											  denseTarget.pc->pts[retIndex].b));
+				// getRGB(0, 5e-3, std::sqrt(outDistSqr)));
 			}
 		}
-
-		this->setMesh(mesh);
-		this->setMesh(neutralMesh);
 	}
 }
 

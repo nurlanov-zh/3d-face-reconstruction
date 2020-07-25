@@ -103,6 +103,7 @@ class MeshViewerWidgetT : public QGLViewerWidget
 	/// inherited drawing method
 	virtual void setupMesh();
 	virtual void draw_scene(const std::string& _draw_mode) override;
+	void saveSceneImage(const std::string& filename);
 
    protected:
 	/// draw the mesh

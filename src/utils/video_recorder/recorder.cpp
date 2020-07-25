@@ -107,8 +107,8 @@ ptr_cloud points_to_pcl(const rs2::points& points,
 	ptr_cloud cloud(new point_cloud);
 
 	// Config of PCL Cloud object
-	cloud->width = 1920;
-	cloud->height = 1080;
+	cloud->width = 640;
+	cloud->height = 480;
 	cloud->is_dense = false;
 	cloud->points.resize(points.size());
 
@@ -144,8 +144,8 @@ void catch_image()
 	// Create a pipeline to easily configure and start the camera
 	rs2::pipeline pipe;
 	rs2::config cfg;
-	cfg.enable_stream(RS2_STREAM_DEPTH);
-	cfg.enable_stream(RS2_STREAM_COLOR);
+	cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480);
+	cfg.enable_stream(RS2_STREAM_COLOR, 640, 480);
 	pipe.start(cfg);
 
 	// Define two align objects. One will be used to align

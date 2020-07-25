@@ -216,7 +216,7 @@ struct geomFunctor
 	double wPoint = 1;
 	double wPlane = 10;
 	double wReg = 0.025;
-	double wLan = 0.125;
+	double wLan = 0.155;
 };
 
 geomFunctor::geomFunctor(

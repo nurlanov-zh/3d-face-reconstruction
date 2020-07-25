@@ -54,6 +54,8 @@
 #include <QFileInfo>
 #include <QImage>
 #include <QKeyEvent>
+#include <opencv2/core/core.hpp>
+#include <opencv2/imgcodecs.hpp>
 // --------------------
 #include <OpenMesh/Core/Utils/vector_cast.hh>
 #include <OpenMesh/Tools/Utils/Timer.hh>
@@ -420,6 +422,33 @@ void MeshViewerWidgetT<M>::draw_openmesh(const std::string& _draw_mode)
 }
 
 //-----------------------------------------------------------------------------
+template <typename M>
+void MeshViewerWidgetT<M>::saveSceneImage(const std::string& filename)
+{
+	constexpr int32_t HEIGHT = 1440;
+	constexpr int32_t WIDTH = 2560;
+	constexpr int32_t BAR = 100;
+
+	cv::Mat pixels(HEIGHT - BAR, WIDTH, CV_8UC3);
+	glReadPixels(0, 0, WIDTH, HEIGHT - BAR, GL_RGB, GL_UNSIGNED_BYTE,
+				 pixels.data);
+	cv::Mat image(HEIGHT - BAR, WIDTH, CV_8UC3);
+
+	for (int y = 0; y < HEIGHT - BAR; y++)
+	{
+		for (int x = 0; x < WIDTH; x++)
+		{
+			image.at<cv::Vec3b>(y, x)[2] =
+				pixels.at<cv::Vec3b>(HEIGHT - BAR - y - 1, x)[0];
+			image.at<cv::Vec3b>(y, x)[1] =
+				pixels.at<cv::Vec3b>(HEIGHT - BAR - y - 1, x)[1];
+			image.at<cv::Vec3b>(y, x)[0] =
+				pixels.at<cv::Vec3b>(HEIGHT - BAR - y - 1, x)[2];
+		}
+	}
+
+	cv::imwrite(filename, image);
+}
 
 template <typename M>
 void MeshViewerWidgetT<M>::draw_scene(const std::string& _draw_mode)
@@ -636,6 +665,9 @@ void MeshViewerWidgetT<M>::setMesh(const Mesh& mesh)
 	meshes_.push_back(mesh);
 	setupMesh();
 	updateGL();
+	static int id = 0;
+	saveSceneImage(std::to_string(id) + ".png");
+	id++;
 }
 
 template <typename M>

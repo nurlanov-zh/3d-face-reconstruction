@@ -175,7 +175,7 @@ void QGLViewerWidget::setDefaultLight(void)
 void QGLViewerWidget::initializeGL()
 {
 	// OpenGL state
-	glClearColor(0.0, 0.0, 0.0, 0.0);
+	glClearColor(0.41, 0.41, 0.41, 0.0);
 	glDisable(GL_DITHER);
 	glEnable(GL_DEPTH_TEST);
 

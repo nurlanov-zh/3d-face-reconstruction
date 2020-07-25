@@ -22,6 +22,7 @@ DataReader::DataReader(const std::string& path, OpenMesh::IO::Options opt,
 	albedoBasisDev_.resize(NUM_OF_EIG_SHAPE);
 
 	correspondences_.resize(NUM_OF_SPARSE_CORR);
+	arnoldCorrespondences_.resize(36);
 
 	landmarkIds_.resize(NUM_OF_LANDMARKS);
 
@@ -31,6 +32,7 @@ DataReader::DataReader(const std::string& path, OpenMesh::IO::Options opt,
 	readKinectData();
 	readCorrespondences();
 	readAssignedLandmarks();
+	readArnoldFace();
 
 	try
 	{
@@ -111,6 +113,56 @@ void DataReader::readPCAFace()
 																	  start)
 					.count()) +
 			"ms");
+	}
+}
+
+void DataReader::readArnoldFace()
+{
+	{
+		const auto start = std::chrono::steady_clock::now();
+		const std::string filename = path_ + "/" + ARNOLD_NAME;
+		if (!openMesh(filename, arnoldMesh_))
+		{
+			errLog_->error("Arnold face is not loaded! Abort!");
+			throw std::runtime_error("Arnold face");
+		}
+		// scale
+		for (auto vIt = arnoldMesh_.vertices_begin();
+			 vIt != arnoldMesh_.vertices_end(); ++vIt)
+		{
+			OpenMesh::Vec3f newCoordinate = arnoldMesh_.point(*vIt);
+			arnoldMesh_.set_point(*vIt, newCoordinate * 1 / 6.);
+		}
+		const auto end = std::chrono::steady_clock::now();
+		consoleLog_->info(
+			"Arnold face is successfully loaded in " +
+			std::to_string(
+				std::chrono::duration_cast<std::chrono::milliseconds>(end -
+																	  start)
+					.count()) +
+			"ms");
+	}
+
+	{
+		const std::string filename = path_ + "/" + ARNOLD_CORR_NAME;
+		std::ifstream in(filename);
+
+		if (!in)
+		{
+			errLog_->error("ERROR:\tCan not open file: " + filename);
+			return;
+		}
+
+		size_t length = 0;
+		in >> length;
+
+		for (size_t x = 0; x < length; x++)
+		{
+			in >> arnoldCorrespondences_[x][1] >>
+				arnoldCorrespondences_[x][0];  // arnold >> averageMesh
+		}
+
+		in.close();
 	}
 }
 

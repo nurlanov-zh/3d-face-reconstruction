@@ -49,6 +49,8 @@ find_package(Eigen3 3.3.7 EXACT REQUIRED MODULE)
 set(EIGEN_INCLUDE_DIR ${EIGEN3_INCLUDE_DIR})  # for ceres
 include_directories(${EIGEN3_INCLUDE_DIR})
   message(STATUS "Found Eigen headers in: ${EIGEN3_INCLUDE_DIR}")
+find_package(SuiteSparse REQUIRED)
+include_directories(${SuiteSparse_INCLUDE_DIRS})
 
 include_directories(thirdparty/Sophus)
 include_directories(thirdparty/spdlog/include)

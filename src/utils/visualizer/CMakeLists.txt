@@ -39,6 +39,7 @@ target_link_libraries (face_viewer
   face_model
   landmark_detection
   data_reader
+  deformation_transfer
   OpenMeshCore
   OpenMeshTools
   Qt5::OpenGL

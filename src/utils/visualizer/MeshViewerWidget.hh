@@ -46,6 +46,7 @@
 
 #include <common/data_types.h>
 #include <data_reader/data_reader.h>
+#include <deformation_transfer/deformation_transfer.h>
 #include <face_model/face_model.h>
 #include <landmark_detection/face_landmark_detection.h>
 #include <non_rigid_icp/non_rigid_icp.h>
@@ -92,18 +93,23 @@ class MeshViewerWidget : public MeshViewerWidgetT<common::Mesh>
    private:
 	void calculateFace(
 		common::Mesh& neutralMesh, const common::Mesh& mesh,
-		const common::Mesh& meshVis,
+		const common::Mesh& denseMesh,
 		const std::vector<common::Vec2i>& procrustesCorrespondences,
 		const std::vector<common::Vec2i>& correspondences);
 
 	common::Vec2i transformImageToDepth(const common::Vec2i& uv);
-
-	void saveImage(const std::string& filename);
 
    private:
 	bool seq_;
 	std::unique_ptr<utils::DataReader> dataReader_;
 	std::unique_ptr<matching::refinement::NRICP> nricp_;
 	std::unique_ptr<matching::optimize::FaceModel> faceModel_;
+	std::unique_ptr<matching::transfer::DeformationTransfer>
+		deformationTransfer_;
+
+	std::vector<common::Vec2i> arnoldCorr_;
+	common::Mesh arnoldMesh_;
+
+	common::Mesh justusNeutralMesh_;
 	OpenMesh::IO::Options _options;
 };

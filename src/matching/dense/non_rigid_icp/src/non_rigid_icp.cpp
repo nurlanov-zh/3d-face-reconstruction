@@ -50,7 +50,7 @@ NRICP::NRICP(const NRICPParams& params) : params_(params)
 		4 * params_.numOfEdges + params_.numOfVertices + params_.numOfLandmarks,
 		3);
 
-	XTPrev_ = Eigen::Matrix3Xf(4 * params_.numOfVertices, 3);
+	XTPrev_ = Eigen::Matrix3Xf(3, 4 * params_.numOfVertices);
 	XTPrev_.setZero();
 	norm_ = 10e10;
 
@@ -253,21 +253,25 @@ void NRICP::initBMatrix(const common::Mesh& source,
 			resPoint = target.pc->pts[retIndex];
 		}
 
-		// set weights of border vertices to zero
+		if (source.is_boundary(*vit))
+		{
+			weights_[idx] = 0;
+		}
 		// set weights if angle between normals above threshold to zero
+		// set weights of border vertices to zero
 		// set if line segment from Xv to u intersects source
 
-		// const auto sourceNormal = source.normal(*vit);
-		// const auto targetNormal =
-		// target.mesh.normal(OpenMesh::VertexHandle(retIndex));
+		const auto sourceNormal = source.normal(*vit);
+		const auto targetNormal =
+			target.mesh.normal(OpenMesh::VertexHandle(retIndex));
 
-		// const auto angle = sourceNormal.dot(targetNormal);
-		// if (angle < params_.normalsThreshold)
-		// {
-		// 	weights_[idx] = 0;
-		// }
+		const auto angle = sourceNormal.dot(targetNormal);
+		if (angle < params_.normalsThreshold)
+		{
+			weights_[idx] = 0;
+		}
 
-		if (outDistSqr > 0.1)
+		if (std::sqrt(outDistSqr) > params_.maxHeighborDist)
 		{
 			weights_[idx] = 0;
 		}
@@ -301,15 +305,18 @@ void NRICP::optimize(common::Mesh& source)
 	for (common::Mesh::VertexIter vit = source.vertices_begin();
 		 vit != source.vertices_end(); ++vit)
 	{
-		const auto& pointSource = source.point(*vit);
-		const Eigen::Vector4f point(pointSource[0], pointSource[1],
-									pointSource[2], 1.0f);
+		if (weights_[vit->idx()] != 0)
+		{
+			const auto& pointSource = source.point(*vit);
+			const Eigen::Vector4f point(pointSource[0], pointSource[1],
+										pointSource[2], 1.0f);
 
-		const Eigen::Vector3f pointTransformed =
-			XT.block<3, 4>(0, 4 * vit->idx()) * point;
+			const Eigen::Vector3f pointTransformed =
+				XT.block<3, 4>(0, 4 * vit->idx()) * point;
 
-		source.set_point(*vit, {pointTransformed(0), pointTransformed(1),
-								pointTransformed(2)});
+			source.set_point(*vit, {pointTransformed(0), pointTransformed(1),
+									pointTransformed(2)});
+		}
 	}
 
 	norm_ = (XTPrev_ - XT).norm();

@@ -175,5 +175,28 @@ void FaceModel::applyToMesh(common::Mesh& mesh,
 	}
 }
 
+void FaceModel::getWithoutExpressions(common::Mesh& mesh, const common::Matrix4d& poseInit)
+{
+	Eigen::Matrix3d poseInitRot_;
+	Eigen::Vector3d poseInitTrans_;
+	poseInitRot_ = poseInit.block(0, 0, 3, 3);
+	poseInitTrans_ = poseInit.block(0, 3, 3, 1);
+
+	size_t i = 0;
+	for (common::Mesh::VertexIter vit = mesh.vertices_begin();
+		 vit != mesh.vertices_end(); i++, vit++)
+	{
+		Eigen::Vector3d vertex =
+			neutralShape_.block(3 * i, 0, 3, 1) +
+			shapeBasis_.block(3 * i, 0, 3,
+							  matching::optimize::NUM_OF_EIG_SHAPE) *
+				shapeBasisCoefs_;
+
+		vertex = transform_ * (poseInitRot_ * vertex + poseInitTrans_);
+
+		mesh.set_point(*vit, {vertex(0), vertex(1), vertex(2)});
+	}
+}
+
 }  // namespace optimize
 }  // namespace matching
