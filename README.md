@@ -1,5 +1,5 @@
 # 3D Face Reconstruction and Deformation Transfer using RGBD data
-This project is the final project for the course [3D Scanning and Motion Capture](https://www.in.tum.de/cg/teaching/winter-term-2021/3d-scanning-motion-capture/) taught at TUM in SS20. For the detailed review please go to our [technical report](https://github.com/nurlanov-zh/event-based-odomety/blob/master/report.pdf)
+This project is the final project for the course [3D Scanning and Motion Capture](https://www.in.tum.de/cg/teaching/winter-term-2021/3d-scanning-motion-capture/) taught at TUM in SS20. For the detailed review please go to our [technical report](https://github.com/nurlanov-zh/3d-face-reconstruction/blob/master/Final_Report.pdf)
 
 # Install and build
 
